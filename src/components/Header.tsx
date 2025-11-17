@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useUIStore } from '../stores/ui';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
-import { Menu, Home, ListChecks, Car, Store, Settings } from 'lucide-react';
+import { Menu, Home, ListChecks, Car, Store, Settings, ShieldAlert } from 'lucide-react';
 
 export function Header() {
   const toggleSidebar = useUIStore(s => s.toggleSidebar);
   const loc = useLocation();
   const user = useAuthStore(s => s.user);
   const isConfigured = useAuthStore(s => s.isConfigured);
+  const role = useAuthStore(s => s.role);
   const isAuthScreen = loc.pathname === '/' || loc.pathname === '/login' || loc.pathname.startsWith('/auth');
   const canToggleSidebar = !!user && !isAuthScreen;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -67,6 +68,13 @@ export function Header() {
                     <Store size={16} className="mr-2" /> Fornecedores
                   </NavLink>
                 </li>
+                {String(role || '').toLowerCase() === 'admin' && (
+                  <li>
+                    <NavLink to="/admin" className="cm-btn cm-btn-ghost w-full justify-start text-left" onClick={() => setMobileMenuOpen(false)}>
+                      <ShieldAlert size={16} className="mr-2" /> Admin
+                    </NavLink>
+                  </li>
+                )}
                 <li>
                   <NavLink to="/settings" className="cm-btn cm-btn-ghost w-full justify-start text-left" onClick={() => setMobileMenuOpen(false)}>
                     <Settings size={16} className="mr-2" /> Configurações

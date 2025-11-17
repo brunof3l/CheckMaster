@@ -1,7 +1,9 @@
 import { NavLink } from 'react-router-dom';
-import { Home, ListChecks, Car, Store, Settings } from 'lucide-react';
+import { Home, ListChecks, Car, Store, Settings, ShieldAlert } from 'lucide-react';
+import { useAuthStore } from '../stores/auth';
 
 export function BottomNav() {
+  const role = useAuthStore(s => s.role);
   const linkCls = ({ isActive }: { isActive: boolean }) => [
     'flex-1 px-2 py-1 h-16',
     'flex items-center justify-center',
@@ -46,6 +48,16 @@ export function BottomNav() {
             </div>
           )}
         </NavLink>
+        {String(role || '').toLowerCase() === 'admin' && (
+          <NavLink to="/admin" className={linkCls}>
+            {({ isActive }) => (
+              <div className="flex flex-col items-center justify-center gap-0.5">
+                <ShieldAlert {...iconProps} />
+                <span className={`text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Admin</span>
+              </div>
+            )}
+          </NavLink>
+        )}
         <NavLink to="/settings" className={linkCls}>
           {({ isActive }) => (
             <div className="flex flex-col items-center justify-center gap-0.5">
