@@ -61,10 +61,50 @@ function subscribeRole(userId: string) {
   } catch {}
 }
 
+// Inatividade: 1 hora
+const INACTIVITY_MS = 60 * 60 * 1000;
+let inactivityTimer: any = null;
+let activityListenersBound = false;
+const LAST_ACTIVE_KEY = 'cm:last_active';
+
+function bindActivityListeners(onActivity: () => void) {
+  if (activityListenersBound) return;
+  activityListenersBound = true;
+  const handler = () => onActivity();
+  ['mousemove','keydown','click','touchstart','scroll','visibilitychange'].forEach(evt => {
+    window.addEventListener(evt as any, handler, { passive: true } as any);
+  });
+}
+
+function unbindActivityListeners() {
+  if (!activityListenersBound) return;
+  activityListenersBound = false;
+  const handler = () => {};
+  ['mousemove','keydown','click','touchstart','scroll','visibilitychange'].forEach(evt => {
+    try { window.removeEventListener(evt as any, handler as any); } catch {}
+  });
+}
+
+function scheduleAutoLogout(signOutFn: () => Promise<void>) {
+  try { if (inactivityTimer) { clearTimeout(inactivityTimer); inactivityTimer = null; } } catch {}
+  const last = Number(localStorage.getItem(LAST_ACTIVE_KEY) || '0') || Date.now();
+  const elapsed = Date.now() - last;
+  const remaining = Math.max(0, INACTIVITY_MS - elapsed);
+  inactivityTimer = setTimeout(async () => {
+    await signOutFn();
+    try { localStorage.removeItem(LAST_ACTIVE_KEY); } catch {}
+  }, remaining);
+}
+
+function touchActivity() {
+  try { localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now())); } catch {}
+  // Timer será reprogramado externamente após este toque
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   role: null,
-  loading: false,
+  loading: true,
   isConfigured: true,
   // Simple client-side rate limit for login attempts
   _attempts: 0 as number,
@@ -116,6 +156,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     await sbSignOut();
     set({ user: null, role: null });
     try { if (roleChannel) { supabase.removeChannel(roleChannel); roleChannel = null; } } catch {}
+    try { if (inactivityTimer) { clearTimeout(inactivityTimer); inactivityTimer = null; } } catch {}
+    try { unbindActivityListeners(); } catch {}
   },
   resetPassword: async (email) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
@@ -129,14 +171,27 @@ export const useAuthStore = create<AuthState>((set) => ({
   init: () => {
     set({ loading: true });
     onAuthStateChange(async (evt) => {
-      const session = evt?.session || (await supabase.auth.getSession()).data.session;
-      const u = session?.user;
+      const session = evt || (await supabase.auth.getSession()).data.session;
+      const u = (session as any)?.user;
       if (!u) { set({ user: null, role: null, loading: false }); return; }
       let r: Role = null;
       const { data: prof } = await supabase.from('users').select('role').eq('id', u.id).single();
       r = (prof?.role as Role) ?? 'editor';
       set({ user: { uid: u.id, email: u.email }, role: r, loading: false });
       subscribeRole(u.id);
+      // Inatividade: se já passou 1h sem atividade, deslogar; caso contrário, iniciar relógio
+      const last = Number(localStorage.getItem(LAST_ACTIVE_KEY) || '0');
+      if (!last) {
+        touchActivity(); // considera o boot como atividade
+      } else if (Date.now() - last >= INACTIVITY_MS) {
+        await (useAuthStore.getState().signOut)();
+        return;
+      }
+      bindActivityListeners(() => {
+        touchActivity();
+        scheduleAutoLogout(useAuthStore.getState().signOut);
+      });
+      scheduleAutoLogout(useAuthStore.getState().signOut);
     });
   },
   refreshRole: async () => {
