@@ -418,7 +418,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
           <div className="text-sm font-semibold">Fotos</div>
           <div className="text-xs text-gray-500">Anexe fotos; compactamos para reduzir tamanho.</div>
           <Controller control={control} name="media" defaultValue={[]} render={({ field }) => (
-            <input ref={mediaInputRef} type="file" className="hidden" accept="image/*" capture="environment" multiple onChange={(e) => {
+            <input ref={mediaInputRef} type="file" className="hidden" accept="image/*" multiple onChange={(e) => {
               const files = Array.from(e.target.files || []);
               const current = (watch('media') || []) as File[];
               field.onChange([ ...current, ...files ]);
@@ -426,7 +426,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
             }} />
           )} />
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => mediaInputRef.current?.click()}>Adicionar fotos</Button>
+            <Button variant="outline" onClick={() => mediaInputRef.current?.click()}>Selecionar fotos</Button>
             {watch('media')?.length ? (
               <div className="text-xs">{watch('media').length} foto(s) selecionada(s)</div>
             ) : (
@@ -478,7 +478,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
             <div className="space-y-1">
               <div className="text-xs text-gray-500">Entrada</div>
               <Controller control={control} name="fuelGaugeEntry" defaultValue={undefined} render={({ field }) => (
-                <input ref={fuelEntryRef} type="file" className="hidden" accept="image/*" capture="environment" onChange={(e) => {
+                <input ref={fuelEntryRef} type="file" className="hidden" accept="image/*" onChange={(e) => {
                   const f = e.target.files?.[0];
                   field.onChange(f || undefined);
                 }} />
@@ -495,7 +495,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
             <div className="space-y-1">
               <div className="text-xs text-gray-500">Saída</div>
               <Controller control={control} name="fuelGaugeExit" defaultValue={undefined} render={({ field }) => (
-                <input ref={fuelExitRef} type="file" className="hidden" accept="image/*" capture="environment" onChange={(e) => {
+                <input ref={fuelExitRef} type="file" className="hidden" accept="image/*" onChange={(e) => {
                   const f = e.target.files?.[0];
                   field.onChange(f || undefined);
                 }} />
