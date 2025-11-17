@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useUIStore } from '../stores/ui';
 import { getCnpjData } from './supabase/rpc';
+import { supabase } from '../config/supabase';
 
 type CnpjResult = {
   cnpj: string;
@@ -21,7 +22,15 @@ export function useCnpjService() {
     if (digits.length !== 14) return null;
     setLoading(true);
     try {
-      // Prefer BrasilAPI (CORS-enabled) and fallback to Supabase RPC cache/mock
+      // 1) Preferir proxy via Supabase Edge Function (consistente em Android/iOS)
+      try {
+        const { data: proxied, error } = await supabase.functions.invoke('cnpj-proxy', { body: { cnpj: digits } });
+        if (!error && proxied) {
+          return proxied as CnpjResult;
+        }
+      } catch {}
+
+      // 2) Tentar BrasilAPI diretamente (em dev pode ser suficiente)
       const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`);
       if (resp.ok) {
         const data = await resp.json();
@@ -45,12 +54,12 @@ export function useCnpjService() {
         };
         return result;
       }
-      // Fallback: Supabase RPC (cache / mock)
+
+      // 3) Fallback final: Supabase RPC (cache/mock do servidor)
       const cached = await getCnpjData(digits);
       return cached as CnpjResult;
     } catch (e: any) {
-      // Em alguns navegadores (Android/Chrome) uma violação de CSP/Network
-      // causa exceção em fetch. Tentar fallback via RPC antes de falhar.
+      // Em caso de erro geral, ainda tentar o fallback RPC
       try {
         const cached = await getCnpjData(digits);
         if (cached) return cached as CnpjResult;
