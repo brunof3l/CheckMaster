@@ -172,7 +172,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (usr?.id) subscribeRole(usr.id);
       return !!usr;
     } catch (e: any) {
-      useUIStore.getState().pushToast({ title: 'Erro de cadastro', message: e.message || 'Erro de autenticação.', variant: 'danger' });
+      const msg: string = e?.message || '';
+      const already = /already\s*registered|email\s*already\s*(exists|registered)/i.test(msg);
+      if (already) {
+        // Se o e-mail já está cadastrado, tentar entrar com a mesma senha.
+        const ok = await (useAuthStore.getState().signIn)(email, pass);
+        if (ok) { return true; }
+        useUIStore.getState().pushToast({ title: 'E-mail já cadastrado', message: 'Use Entrar ou toque em Recuperar senha.', variant: 'warning' });
+        set({ loading: false });
+        return false;
+      }
+      useUIStore.getState().pushToast({ title: 'Erro de cadastro', message: authErrorToMessage(e), variant: 'danger' });
       set({ loading: false });
       return false;
     }
