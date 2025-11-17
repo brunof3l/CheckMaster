@@ -49,7 +49,13 @@ export function useCnpjService() {
       const cached = await getCnpjData(digits);
       return cached as CnpjResult;
     } catch (e: any) {
-      useUIStore.getState().pushToast({ title: 'Erro CNPJ', message: e.message || 'Falha ao consultar CNPJ', variant: 'danger' });
+      // Em alguns navegadores (Android/Chrome) uma violação de CSP/Network
+      // causa exceção em fetch. Tentar fallback via RPC antes de falhar.
+      try {
+        const cached = await getCnpjData(digits);
+        if (cached) return cached as CnpjResult;
+      } catch {}
+      useUIStore.getState().pushToast({ title: 'Erro CNPJ', message: e?.message || 'Falha ao consultar CNPJ', variant: 'danger' });
       return null;
     } finally {
       setLoading(false);
