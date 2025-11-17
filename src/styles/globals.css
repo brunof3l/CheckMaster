@@ -110,7 +110,16 @@
 .dark .cm-card { @apply bg-black/30 border-white/10; }
 
 /* toasts */
-.cm-toast-container { @apply fixed bottom-4 right-4 z-50 space-y-2; }
+/* Elevar z-index e ajustar offset inferior no mobile para não ficar atrás da BottomNav */
+.cm-toast-container { @apply fixed right-4 space-y-2; bottom: 1rem; z-index: 60; }
+@media (max-width: 768px) {
+  .cm-toast-container {
+    /* h-16 da BottomNav = 4rem; somar margem e safe area */
+    bottom: calc(1rem + 4rem + env(safe-area-inset-bottom));
+    right: 1rem;
+    left: 1rem;
+  }
+}
 .cm-toast { @apply cm-card shadow-lg p-3 animate-fade-in; }
 .cm-toast-title { @apply text-sm font-semibold; }
 .cm-toast-message { @apply text-xs; }
