@@ -24,7 +24,6 @@ export function Login() {
   const [showConfirm, setShowConfirm] = useState(false);
   const signIn = useAuthStore(s => s.signIn);
   const signUp = useAuthStore(s => s.signUp);
-  const signInGoogle = useAuthStore(s => s.signInGoogle);
   const resetPassword = useAuthStore(s => s.resetPassword);
   const isConfigured = useAuthStore(s => s.isConfigured);
   const navigate = useNavigate();
@@ -105,8 +104,7 @@ export function Login() {
           )}
           <Button type="submit" block variant="primary">{mode === 'login' ? 'Entrar' : 'Cadastrar'}</Button>
         </form>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={() => signInGoogle()}>Entrar com Google</Button>
+        <div className="mt-3 grid grid-cols-1 gap-2">
           <Button variant="outline" onClick={() => resetPassword(prompt('E-mail para recuperar senha?') || '')}>Recuperar senha</Button>
         </div>
         <p className="text-xs text-center mt-3">
