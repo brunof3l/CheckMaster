@@ -10,11 +10,10 @@ import { Button } from '../components/ui/Button';
 import { useUIStore } from '../stores/ui';
 import { Eye, EyeOff } from 'lucide-react';
 
+// Para login, não exigir complexidade de senha — apenas campo obrigatório
 const schema = z.object({
   email: z.string().email('E-mail inválido'),
-  password: z.string()
-    .min(8, 'Mínimo 8 caracteres')
-    .regex(/^(?=.*[A-Za-z])(?=.*\d).+$/, 'Deve conter letras e números')
+  password: z.string().min(1, 'Informe sua senha')
 }).passthrough();
 type FormData = z.infer<typeof schema> & { displayName?: string; confirmPassword?: string };
 
@@ -36,8 +35,13 @@ export function Login() {
     if (mode === 'signup') {
       const nameOk = !!(d.displayName && d.displayName.trim().length >= 2);
       const confirmOk = d.password === d.confirmPassword;
+      const strong = d.password.length >= 8 && /[A-Za-z]/.test(d.password) && /\d/.test(d.password);
       if (!nameOk || !confirmOk) {
         pushToast({ title: 'Cadastro inválido', message: !nameOk ? 'Informe seu nome' : 'Senhas diferentes', variant: 'warning' });
+        return;
+      }
+      if (!strong) {
+        pushToast({ title: 'Senha inválida', message: 'Mínimo 8 caracteres, com letras e números.', variant: 'warning' });
         return;
       }
     }
@@ -47,11 +51,15 @@ export function Login() {
   };
 
   const onInvalid = (errors: any) => {
-    if (mode !== 'signup') return;
-    const msg = errors?.password?.message as string | undefined;
-    if (msg) {
-      pushToast({ title: 'Senha inválida', message: msg || 'Senha não atende aos requisitos mínimos.', variant: 'warning' });
+    // Em login, pode aparecer erro de e-mail ou senha vazia
+    if (mode === 'login') {
+      const emailMsg = errors?.email?.message as string | undefined;
+      const passMsg = errors?.password?.message as string | undefined;
+      const msg = emailMsg || passMsg;
+      if (msg) pushToast({ title: 'Dados inválidos', message: msg, variant: 'warning' });
+      return;
     }
+    // No cadastro, tratamos mensagens de validação adicionais no onSubmit
   };
 
   return (
