@@ -26,6 +26,8 @@ const schema = z.object({
   supplierId: z.string().min(1),
   responsible: z.string().min(1),
   defectItems: z.array(z.object({ itemId: z.string(), name: z.string(), note: z.string().optional() })).default([]),
+  // Campo livre para "Outros" em vez de checkbox
+  otherDefects: z.string().optional(),
   media: z.array(z.instanceof(File)).default([]),
   budgetFiles: z.array(z.instanceof(File)).default([]),
   fuelGaugeEntry: z.instanceof(File).optional(),
@@ -40,6 +42,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
     resolver: zodResolver(schema),
     defaultValues: {
       defectItems: [],
+      otherDefects: '',
       media: [],
       budgetFiles: [],
       fuelGas: { entries: [], exits: [] }
@@ -170,12 +173,20 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         const svcLine = `Serviço: ${data.service}`;
         return base ? `${base}\n${svcLine}` : svcLine;
       })();
+      // Agrega "Outros" ao array de itens com a nota digitada
+      const defects = (() => {
+        const base = [...(data.defectItems || [])];
+        const text = (data.otherDefects || '').trim();
+        if (text) base.push({ itemId: 'outros', name: 'Outros', note: text });
+        return base;
+      })();
+
       const checklist = await insertChecklist({
         seq: null,
         plate: data.plateId,
         supplier_id: supplierUuid,
         // service: data.service, // removido para evitar erro quando coluna não existe
-        defect_items: data.defectItems,
+        defect_items: defects,
         media: [],
         status: 'rascunho',
         notes: combinedNotes,
@@ -375,16 +386,29 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       <section className="space-y-2">
         <div className="text-xs text-gray-500">Selecione itens com defeito</div>
         <div className="grid grid-cols-2 gap-2">
-          {['Freio','Pneu','Luz','Óleo'].map((name, idx) => (
+          {[
+            'Farol Esq.', 'Farol Dir.', 'Pisca Esq.', 'Pisca Dir.', 'Lanterna Esq.', 'Lanterna Dir.', 'Luz Freio', 'Luz Placa', 'Buzina',
+            'Ar condicionado', 'Retrovisor Interno', 'Retrovisor Esq.', 'Retrovisor Dir.',
+            'Nível de Óleo Motor', 'Nível Óleo Hidráulico', 'Nível Água Parabrisa', 'Nível Fluído de Freio', 'Nível Líq. Arrefecimento',
+            'Limpador Parabrisa', 'Vidros Laterais', 'Parabrisa Traseiro', 'Parabrisa Dianteiro', 'Vidros Elétricos',
+            'Rádio', 'Estofamento Bancos', 'Tapetes Internos', 'Forro Interno',
+            'Macaco', 'Chave de Roda', 'Estepe', 'Triângulo', 'Extintor', 'Bateria', 'Indicadores Painel', 'Documento Veicular', 'Maca e Salão Atend',
+            'Portas traseiras', 'Aspecto Geral', 'Cartão Estacionamento', 'GPS', 'Cintos de segurança', 'Limpeza Interior', 'Limpeza Exterior', 'Chave Ignição'
+          ].map((name, idx) => (
             <label key={idx} className="cm-card px-3 py-2 flex items-center gap-2">
               <input type="checkbox" onChange={(e) => {
                 const arr = watch('defectItems') || [];
-                if (e.target.checked) setValue('defectItems', [...arr, { itemId: `item_${idx}`, name }]);
-                else setValue('defectItems', arr.filter(x => x.itemId !== `item_${idx}`));
+                const id = `item_${idx}`;
+                if (e.target.checked) setValue('defectItems', [...arr, { itemId: id, name }]);
+                else setValue('defectItems', arr.filter(x => x.itemId !== id));
               }} />
               <span>{name}</span>
             </label>
           ))}
+        </div>
+        <div className="space-y-1">
+          <div className="text-xs text-gray-500">Outros defeitos (descreva)</div>
+          <textarea {...register('otherDefects')} className="cm-input" placeholder="Ex.: barulho na suspensão, vazamento, etc." />
         </div>
       </section>
     ),
