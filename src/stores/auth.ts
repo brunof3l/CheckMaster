@@ -121,6 +121,19 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { data, error } = await sbSignIn(email, pass);
       if (error) throw error;
       const usr = data?.user;
+      // Garante perfil na tabela public.users (id/email/display_name)
+      try {
+        if (usr?.id) {
+          const profile = { id: usr.id, email: usr.email, display_name: (usr.user_metadata as any)?.displayName || (usr.email || '')?.split('@')[0] } as any;
+          // Upsert com conflito em id; se update não for permitido, insert garantirá novo registro
+          const up = await supabase.from('users').upsert(profile, { onConflict: 'id' });
+          const msg = up.error?.message || '';
+          // Ignora erros de coluna inexistente (ex.: display_name) e segue
+          if (up.error && !/column\s+"?display_name"?\s+does\s+not\s+exist/i.test(msg)) {
+            throw up.error;
+          }
+        }
+      } catch {}
       let r: Role = null;
       if (usr) {
         const { data: prof } = await supabase.from('users').select('role').eq('id', usr.id).single();
@@ -143,6 +156,18 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { data, error } = await sbSignUp(email, pass, displayName);
       if (error) throw error;
       const usr = data?.user;
+      // Cria perfil imediatamente no cadastro
+      try {
+        if (usr?.id) {
+          const profile = { id: usr.id, email: usr.email, display_name: displayName || (usr.email || '')?.split('@')[0], role: 'editor', is_active: true } as any;
+          const up = await supabase.from('users').upsert(profile, { onConflict: 'id' });
+          const msg = up.error?.message || '';
+          // Se colunas opcionais não existirem, tenta um payload mínimo
+          if (up.error && /column/i.test(msg)) {
+            await supabase.from('users').upsert({ id: usr.id, email: usr.email, display_name: displayName || (usr.email || '')?.split('@')[0] }, { onConflict: 'id' });
+          }
+        }
+      } catch {}
       set({ user: usr ? { uid: usr.id, email: usr.email } : null, role: 'editor', loading: false });
       if (usr?.id) subscribeRole(usr.id);
       return !!usr;
@@ -174,6 +199,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       const session = evt || (await supabase.auth.getSession()).data.session;
       const u = (session as any)?.user;
       if (!u) { set({ user: null, role: null, loading: false }); return; }
+      // Garante perfil ao iniciar sessão
+      try {
+        const profile = { id: u.id, email: u.email, display_name: (u.user_metadata as any)?.displayName || (u.email || '')?.split('@')[0] } as any;
+        const up = await supabase.from('users').upsert(profile, { onConflict: 'id' });
+        const msg = up.error?.message || '';
+        if (up.error && !/column\s+"?display_name"?\s+does\s+not\s+exist/i.test(msg)) {
+          // Se falhar por outra razão, prossegue sem travar init
+        }
+      } catch {}
       let r: Role = null;
       const { data: prof } = await supabase.from('users').select('role').eq('id', u.id).single();
       r = (prof?.role as Role) ?? 'editor';

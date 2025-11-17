@@ -149,6 +149,14 @@ do $$ begin
     );
   exception when duplicate_object then null; end;
 
+  -- Permitir que qualquer usuário autenticado crie seu próprio registro em public.users
+  begin
+    drop policy if exists users_insert_self on public.users;
+    create policy users_insert_self on public.users
+    for insert to authenticated
+    with check (id = auth.uid());
+  exception when duplicate_object then null; end;
+
   -- checklists
   begin
     create policy checklists_read_any on public.checklists
