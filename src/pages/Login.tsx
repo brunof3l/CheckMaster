@@ -10,11 +10,16 @@ import { Button } from '../components/ui/Button';
 import { useUIStore } from '../stores/ui';
 import { Eye, EyeOff } from 'lucide-react';
 
-const schema = z.object({ email: z.string().email('E-mail inválido'), password: z.string().min(8, 'Mínimo 8 caracteres') }).passthrough();
+const schema = z.object({
+  email: z.string().email('E-mail inválido'),
+  password: z.string()
+    .min(8, 'Mínimo 8 caracteres')
+    .regex(/^(?=.*[A-Za-z])(?=.*\d).+$/, 'Deve conter letras e números')
+}).passthrough();
 type FormData = z.infer<typeof schema> & { displayName?: string; confirmPassword?: string };
 
 export function Login() {
-  const { register, handleSubmit } = useForm<FormData>({ resolver: zodResolver(schema) });
+  const { register, handleSubmit, formState } = useForm<FormData>({ resolver: zodResolver(schema) });
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -41,6 +46,14 @@ export function Login() {
     if (ok) navigate('/home', { replace: true });
   };
 
+  const onInvalid = (errors: any) => {
+    if (mode !== 'signup') return;
+    const msg = errors?.password?.message as string | undefined;
+    if (msg) {
+      pushToast({ title: 'Senha inválida', message: msg || 'Senha não atende aos requisitos mínimos.', variant: 'warning' });
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-3rem)] grid place-items-center px-3">
       <Card className="w-full max-w-sm">
@@ -51,7 +64,7 @@ export function Login() {
             <p className="text-xs text-amber-600 mt-2">Configurar .env com credenciais do Firebase para autenticar.</p>
           )}
         </div>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+        <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-3">
           {mode === 'signup' && (
             <Input {...register('displayName')} type="text" placeholder="Seu nome" label="Nome" />
           )}
