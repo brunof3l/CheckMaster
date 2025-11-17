@@ -161,3 +161,7 @@
 .cm-btn-outline.fx-push, .cm-btn-ghost.fx-push {
   background-image: none;
 }
+
+/* BottomNav labels: ocultar em telas muito pequenas para evitar aperto */
+.bn-label { display: none; }
+@media (min-width: 380px) { .bn-label { display: inline; } }

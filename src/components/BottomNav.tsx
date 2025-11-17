@@ -20,7 +20,7 @@ export function BottomNav() {
           {({ isActive }) => (
             <div className="flex flex-col items-center justify-center gap-0.5">
               <Home {...iconProps} />
-              <span className={`text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Home</span>
+              <span className={`bn-label text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Home</span>
             </div>
           )}
         </NavLink>
@@ -28,7 +28,7 @@ export function BottomNav() {
           {({ isActive }) => (
             <div className="flex flex-col items-center justify-center gap-0.5">
               <ListChecks {...iconProps} />
-              <span className={`text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Checklists</span>
+              <span className={`bn-label text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Checklists</span>
             </div>
           )}
         </NavLink>
@@ -36,7 +36,7 @@ export function BottomNav() {
           {({ isActive }) => (
             <div className="flex flex-col items-center justify-center gap-0.5">
               <Car {...iconProps} />
-              <span className={`text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Veículos</span>
+              <span className={`bn-label text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Veículos</span>
             </div>
           )}
         </NavLink>
@@ -44,7 +44,7 @@ export function BottomNav() {
           {({ isActive }) => (
             <div className="flex flex-col items-center justify-center gap-0.5">
               <Store {...iconProps} />
-              <span className={`text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Fornecedores</span>
+              <span className={`bn-label text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Fornecedores</span>
             </div>
           )}
         </NavLink>
@@ -53,7 +53,7 @@ export function BottomNav() {
             {({ isActive }) => (
               <div className="flex flex-col items-center justify-center gap-0.5">
                 <ShieldAlert {...iconProps} />
-                <span className={`text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Admin</span>
+                <span className={`bn-label text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Admin</span>
               </div>
             )}
           </NavLink>
@@ -62,7 +62,7 @@ export function BottomNav() {
           {({ isActive }) => (
             <div className="flex flex-col items-center justify-center gap-0.5">
               <Settings {...iconProps} />
-              <span className={`text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Config</span>
+              <span className={`bn-label text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Config</span>
             </div>
           )}
         </NavLink>

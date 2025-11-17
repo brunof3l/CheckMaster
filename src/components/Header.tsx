@@ -46,7 +46,7 @@ export function Header() {
         {/* Dropdown de navegação no mobile */}
         {canToggleSidebar && mobileMenuOpen && (
           <div className="absolute left-0 right-0 top-full mt-2 md:hidden z-50">
-            <div className="cm-card p-2 shadow-xl w-full">
+            <div className="cm-card p-2 shadow-xl w-full max-h-[50vh] overflow-auto">
               <ul className="space-y-1">
                 <li>
                   <NavLink to="/home" className="cm-btn cm-btn-ghost w-full justify-start text-left" onClick={() => setMobileMenuOpen(false)}>
