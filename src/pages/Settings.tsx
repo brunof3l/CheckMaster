@@ -8,8 +8,6 @@ export function SettingsPage() {
   const role = useAuthStore(s => s.role);
   const signOut = useAuthStore(s => s.signOut);
   const refreshRole = useAuthStore(s => s.refreshRole);
-  const theme = useUIStore(s => s.theme);
-  const toggleTheme = useUIStore(s => s.toggleTheme);
   const pushToast = useUIStore(s => s.pushToast);
 
   const handleRefreshRole = async () => {
@@ -31,10 +29,6 @@ export function SettingsPage() {
         <div className="text-xs">{user?.email}</div>
         {user?.uid && (<div className="text-[10px] text-gray-500">UID: {user.uid}</div>)}
         <Button className="mt-2" variant="outline" onClick={signOut}>Sair</Button>
-      </Card>
-      <Card title="Tema">
-        <div className="text-xs">Atual: {theme}</div>
-        <Button className="mt-2" variant="outline" onClick={toggleTheme}>Alternar</Button>
       </Card>
       <Card>
         <div className="text-xs">RBAC: admin, editor, visualizador • Rotas protegidas</div>
