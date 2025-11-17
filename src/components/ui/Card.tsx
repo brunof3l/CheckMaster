@@ -6,7 +6,7 @@ export function Card({ className = '', title, actions, children }: CardProps) {
   return (
     <div className={["cm-card", "animate-fade-in", className].filter(Boolean).join(' ')}>
       {(title || actions) && (
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           {title && <h3 className="text-sm font-semibold">{title}</h3>}
           {actions}
         </div>

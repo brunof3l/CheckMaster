@@ -235,13 +235,13 @@ export function AdminPage() {
               </div>
               <ul className="divide-y">
                 {(users.slice(0, usrShowAll ? users.length : 5)).map(u => (
-                  <li key={u.id} className="py-2 text-xs flex items-center justify-between">
-                    <div>
-                      {u.display_name || 'Sem nome'} • {u.email || '—'}
+                  <li key={u.id} className="py-2 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="min-w-0 break-words">
+                      {u.display_name || 'Sem nome'} • <span className="break-all">{u.email || '—'}</span>
                       <span className="ml-2 cm-badge cm-badge-outline">{String(u.role || 'editor')}</span>
                       {!u.is_active && <span className="ml-2 cm-badge cm-badge-danger">inativo</span>}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button size="sm" variant="outline" onClick={() => toggleUserRole(u)}>
                         {String(u.role || 'editor').toLowerCase() === 'admin' ? 'Rebaixar' : 'Promover'}
                       </Button>
@@ -266,7 +266,7 @@ export function AdminPage() {
         {loading ? <div className="cm-skeleton h-8" /> : (
           vehicles.length ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch gap-2">
                 <input
                   value={vehQuery}
                   onChange={e => setVehQuery(e.target.value)}
@@ -290,8 +290,8 @@ export function AdminPage() {
                   })
                   .slice(0, vehShowAll ? vehicles.length : 5))
                   .map(v => (
-                  <li key={v.id} className="py-2 text-xs flex items-center justify-between">
-                    <div>{v.plate} • {v.model || ''} {v.brand || ''}</div>
+                  <li key={v.id} className="py-2 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="min-w-0 break-words">{v.plate} • {v.model || ''} {v.brand || ''}</div>
                     <Button size="sm" variant="danger" onClick={() => confirmDelete('vehicle', v.id)}><Trash2 size={14} /> Excluir</Button>
                   </li>
                 ))}
@@ -345,8 +345,8 @@ export function AdminPage() {
               </div>
               <ul className="divide-y">
                 {(suppliers.slice(0, supShowAll ? suppliers.length : 5)).map(s => (
-                  <li key={s.id} className="py-2 text-xs flex items-center justify-between">
-                    <div>{getSupplierName(s) || 'Sem nome'} • {s.cnpj || '—'}</div>
+                  <li key={s.id} className="py-2 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="min-w-0 break-words">{getSupplierName(s) || 'Sem nome'} • <span className="break-all">{s.cnpj || '—'}</span></div>
                     <Button size="sm" variant="danger" onClick={() => confirmDelete('supplier', s.id)}><Trash2 size={14} /> Excluir</Button>
                   </li>
                 ))}
@@ -368,8 +368,8 @@ export function AdminPage() {
               </div>
               <ul className="divide-y">
                 {(checklists.slice(0, chkShowAll ? checklists.length : 5)).map(c => (
-                  <li key={c.id} className="py-2 text-xs flex items-center justify-between">
-                    <div>{c.seq || c.id} • {c.plate || '—'} • {c.status || ''}</div>
+                  <li key={c.id} className="py-2 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="min-w-0 break-words">{c.seq || c.id} • {c.plate || '—'} • {c.status || ''}</div>
                     <Button size="sm" variant="danger" onClick={() => confirmDelete('checklist', c.id)}><Trash2 size={14} /> Excluir</Button>
                   </li>
                 ))}
