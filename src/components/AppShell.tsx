@@ -30,14 +30,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="cm-app min-h-screen flex flex-col">
         <Header />
         <div className={`flex-1 pb-16 md:pb-0`}> {/* espaço para bottom nav em mobile */}
-          <div className="container-m flex gap-4">
+          {/* Remover container no wrapper para encostar a Sidebar na borda esquerda */}
+          <div className="flex gap-4">
             {showSidebar ? (
               <div className="hidden md:block">
                 <Sidebar />
               </div>
             ) : null}
-            <main className="flex-1 animate-fade-in px-3 md:px-4 lg:px-6 py-3">
-              {children}
+            <main className="flex-1 animate-fade-in py-3">
+              {/* Aplicar container somente no conteúdo principal */}
+              <div className="container-m px-3 md:px-4 lg:px-6">
+                {children}
+              </div>
             </main>
           </div>
         </div>

@@ -1,27 +1,44 @@
 import { useAuthStore } from '../stores/auth';
 import { useUIStore } from '../stores/ui';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 
 export function SettingsPage() {
   const user = useAuthStore(s => s.user);
   const role = useAuthStore(s => s.role);
   const signOut = useAuthStore(s => s.signOut);
+  const refreshRole = useAuthStore(s => s.refreshRole);
   const theme = useUIStore(s => s.theme);
   const toggleTheme = useUIStore(s => s.toggleTheme);
+  const pushToast = useUIStore(s => s.pushToast);
+
+  const handleRefreshRole = async () => {
+    await refreshRole();
+    const newRole = (useAuthStore.getState().role || '—') as any;
+    pushToast({ title: 'Papel atualizado', message: `Atual: ${newRole}`, variant: 'info' });
+  };
   return (
     <div className="space-y-3 py-3">
-      <div className="border rounded p-3">
-        <div className="text-sm">Perfil</div>
-        <div className="text-xs">{user?.email} • {role}</div>
-        <button className="mt-2 py-2 px-3 border rounded" onClick={signOut}>Sair</button>
-      </div>
-      <div className="border rounded p-3">
-        <div className="text-sm">Tema</div>
+      <Card
+        title="Perfil"
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="text-xs">{role}</span>
+            <Button variant="outline" size="sm" onClick={handleRefreshRole}>Atualizar papel</Button>
+          </div>
+        }
+      >
+        <div className="text-xs">{user?.email}</div>
+        {user?.uid && (<div className="text-[10px] text-gray-500">UID: {user.uid}</div>)}
+        <Button className="mt-2" variant="outline" onClick={signOut}>Sair</Button>
+      </Card>
+      <Card title="Tema">
         <div className="text-xs">Atual: {theme}</div>
-        <button className="mt-2 py-2 px-3 border rounded" onClick={toggleTheme}>Alternar</button>
-      </div>
-      <div className="border rounded p-3 text-xs">
-        RBAC: admin, editor, visualizador • Rotas protegidas
-      </div>
+        <Button className="mt-2" variant="outline" onClick={toggleTheme}>Alternar</Button>
+      </Card>
+      <Card>
+        <div className="text-xs">RBAC: admin, editor, visualizador • Rotas protegidas</div>
+      </Card>
     </div>
   );
 }

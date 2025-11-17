@@ -1,16 +1,59 @@
 import { NavLink } from 'react-router-dom';
+import { Home, ListChecks, Car, Store, Settings } from 'lucide-react';
 
 export function BottomNav() {
-  const linkCls = ({ isActive }: { isActive: boolean }) =>
-    `flex-1 text-center py-2 text-xs ${isActive ? 'text-blue-600' : 'text-gray-500'}`;
+  const linkCls = ({ isActive }: { isActive: boolean }) => [
+    'flex-1 px-2 py-1 h-16',
+    'flex items-center justify-center',
+    'hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors',
+    isActive ? 'text-[var(--cm-primary)] font-semibold bg-[var(--cm-primary)]/10' : 'text-gray-500 dark:text-white/60'
+  ].join(' ');
+
+  const iconProps = { size: 20, strokeWidth: 2, 'aria-hidden': true } as const;
+
   return (
-    <nav className="fixed bottom-0 inset-x-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-brand">
-      <div className="flex items-center justify-between">
-        <NavLink to="/home" className={linkCls}>Home</NavLink>
-        <NavLink to="/checklists" className={linkCls}>Checklists</NavLink>
-        <NavLink to="/vehicles" className={linkCls}>Veículos</NavLink>
-        <NavLink to="/suppliers" className={linkCls}>Fornecedores</NavLink>
-        <NavLink to="/settings" className={linkCls}>Config</NavLink>
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-white/10 bg-black/30 dark:bg-black/30 backdrop-blur-md">
+      <div className="container-m flex items-center justify-between gap-1 pb-[env(safe-area-inset-bottom)]">
+        <NavLink to="/home" className={linkCls}>
+          {({ isActive }) => (
+            <div className="flex flex-col items-center justify-center gap-0.5">
+              <Home {...iconProps} />
+              <span className={`text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Home</span>
+            </div>
+          )}
+        </NavLink>
+        <NavLink to="/checklists" className={linkCls}>
+          {({ isActive }) => (
+            <div className="flex flex-col items-center justify-center gap-0.5">
+              <ListChecks {...iconProps} />
+              <span className={`text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Checklists</span>
+            </div>
+          )}
+        </NavLink>
+        <NavLink to="/vehicles" className={linkCls}>
+          {({ isActive }) => (
+            <div className="flex flex-col items-center justify-center gap-0.5">
+              <Car {...iconProps} />
+              <span className={`text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Veículos</span>
+            </div>
+          )}
+        </NavLink>
+        <NavLink to="/suppliers" className={linkCls}>
+          {({ isActive }) => (
+            <div className="flex flex-col items-center justify-center gap-0.5">
+              <Store {...iconProps} />
+              <span className={`text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Fornecedores</span>
+            </div>
+          )}
+        </NavLink>
+        <NavLink to="/settings" className={linkCls}>
+          {({ isActive }) => (
+            <div className="flex flex-col items-center justify-center gap-0.5">
+              <Settings {...iconProps} />
+              <span className={`text-[10px] leading-none ${isActive ? 'text-[var(--cm-primary)]' : ''}`}>Config</span>
+            </div>
+          )}
+        </NavLink>
       </div>
     </nav>
   );

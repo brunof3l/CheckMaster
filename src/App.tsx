@@ -1,34 +1,25 @@
 import { useEffect } from 'react';
-import { BrowserRouter, useLocation } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 import { AppRoutes } from './routes';
-import { Header } from './components/Header';
-import { BottomNav } from './components/BottomNav';
-import { useUIStore } from './stores/ui';
+import { AppShell } from './components/AppShell';
 import { useAuthStore } from './stores/auth';
 
-function LayoutWithConditionalNav() {
-  const theme = useUIStore(s => s.theme);
-  const initAuth = useAuthStore(s => s.init);
-  const user = useAuthStore(s => s.user);
-  const loc = useLocation();
-  useEffect(() => { initAuth(); }, [initAuth]);
-  return (
-    <div className={theme === 'dark' ? 'dark' : ''}>
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1 container-m pb-16">
-          <AppRoutes />
-        </main>
-        {user && loc.pathname !== '/' ? <BottomNav /> : null}
-      </div>
-    </div>
-  );
-}
+function LayoutWithShell() { return <AppShell><AppRoutes /></AppShell>; }
 
 export function App() {
+  const initAuth = useAuthStore(s => s.init);
+  const refreshRole = useAuthStore(s => s.refreshRole);
+  useEffect(() => {
+    initAuth();
+    // Garante sincronização da role no boot (fallback ao Realtime)
+    refreshRole();
+  }, [initAuth, refreshRole]);
   return (
-    <BrowserRouter>
-      <LayoutWithConditionalNav />
+    <BrowserRouter future={{
+      v7_startTransition: true,
+      v7_relativeSplatPath: true,
+    }}>
+      <LayoutWithShell />
     </BrowserRouter>
   );
 }

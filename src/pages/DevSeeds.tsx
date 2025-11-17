@@ -1,19 +1,16 @@
 import { useState } from 'react';
-import { getFirestore, collection, addDoc } from 'firebase/firestore';
-import { getFirebaseApp } from '../services/firebase/app';
+import { supabase } from '../config/supabase';
 
 export function DevSeeds() {
   const [message, setMessage] = useState('');
-  const app = getFirebaseApp();
-  const canSeed = !!app;
+  const canSeed = !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
   const run = async () => {
-    if (!app) { setMessage('Configure Firebase para executar seeds.'); return; }
-    const db = getFirestore(app);
-    await addDoc(collection(db, 'check_items'), { name: 'Freio', order: 1 });
-    await addDoc(collection(db, 'check_items'), { name: 'Pneu', order: 2 });
-    await addDoc(collection(db, 'vehicles'), { plate: 'ABC1D23', model: 'Hatch', brand: 'Marca', year: 2020, color: 'Prata', createdAt: Date.now() });
-    await addDoc(collection(db, 'suppliers'), { cnpj: '00.000.000/0000-00', razaoSocial: 'Fornecedor Exemplo', nomeFantasia: 'Fornecedor', createdAt: Date.now() });
-    setMessage('Seeds criadas.');
+    try {
+      await supabase.from('check_items').insert([{ name: 'Freio' }, { name: 'Pneu' }]);
+      await supabase.from('vehicles').insert([{ plate: 'ABC1D23', model: 'Hatch', brand: 'Marca', year: 2020 }]);
+      await supabase.from('suppliers').insert([{ cnpj: '00.000.000/0000-00', nome: 'Fornecedor Exemplo', telefone: '', email: '' }]);
+      setMessage('Seeds criadas.');
+    } catch (e: any) { setMessage(e?.message || 'Falha ao criar seeds'); }
   };
   return (
     <div className="py-3">

@@ -12,13 +12,26 @@ export function Header() {
   const isAuthScreen = loc.pathname === '/' || loc.pathname === '/login' || loc.pathname.startsWith('/auth');
   const canToggleSidebar = !!user && !isAuthScreen;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const handleMenuClick = () => {
+    if (!canToggleSidebar) return;
+    // Desktop: alterna Sidebar; Mobile: abre dropdown
+    if (window.matchMedia('(min-width: 768px)').matches) {
+      toggleSidebar();
+    } else {
+      setMobileMenuOpen(v => !v);
+    }
+  };
   return (
     <header className="sticky top-0 z-40 backdrop-blur border-b border-white/10 bg-black/40">
-      {/* Header com container centralizado para alinhar com o conteúdo */}
-      <div className="container-m h-12 flex items-center justify-between relative">
+      {/* Header alinhado com o recuo da Sidebar (px-3) */}
+      <div className="h-12 flex items-center justify-between px-3 relative">
         <div className="flex items-center gap-2">
           {canToggleSidebar && (
-            <button aria-label="Abrir menu" className="cm-btn cm-btn-outline cm-btn-sm inline-flex md:hidden" onClick={() => setMobileMenuOpen(v => !v)}>
+            <button
+              aria-label="Abrir/fechar menu"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-black text-white shadow border border-white/10 hover:bg-black/80"
+              onClick={handleMenuClick}
+            >
               <Menu size={16} aria-hidden />
             </button>
           )}
@@ -65,9 +78,7 @@ export function Header() {
         )}
       </div>
       {!isConfigured && (
-        <div className="text-xs">
-          <div className="container-m py-1"><span className="cm-badge cm-badge-warning">Firebase não configurado</span></div>
-        </div>
+        <div className="text-xs px-3 py-1"><span className="cm-badge cm-badge-warning">Firebase não configurado</span></div>
       )}
     </header>
   );

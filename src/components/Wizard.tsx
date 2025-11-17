@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { Button } from './ui/Button';
 
-export function Wizard({ steps, onFinish }: { steps: React.ReactNode[]; onFinish: () => void }) {
+export function Wizard({ steps, onFinish, busy }: { steps: React.ReactNode[]; onFinish: () => void; busy?: boolean }) {
   const [index, setIndex] = useState(0);
   const isFirst = index === 0;
   const isLast = index === steps.length - 1;
@@ -12,13 +13,13 @@ export function Wizard({ steps, onFinish }: { steps: React.ReactNode[]; onFinish
         ))}
       </div>
       <div>{steps[index]}</div>
-      <div className="fixed bottom-16 inset-x-0 p-3 bg-gradient-to-t from-white dark:from-brand">
-        <div className="container-m flex gap-2">
-          <button className="flex-1 py-2 border rounded" disabled={isFirst} onClick={() => setIndex(i => i - 1)}>Voltar</button>
+      <div className="mt-3">
+        <div className="flex gap-2">
+          <Button className="flex-1" size="md" variant="outline" disabled={isFirst || !!busy} onClick={() => setIndex(i => i - 1)}>Voltar</Button>
           {isLast ? (
-            <button className="flex-1 py-2 border rounded bg-blue-600 text-white" onClick={onFinish}>Finalizar</button>
+            <Button className="flex-1" size="md" onClick={onFinish} disabled={!!busy}>{busy ? 'Finalizando…' : 'Finalizar'}</Button>
           ) : (
-            <button className="flex-1 py-2 border rounded bg-blue-600 text-white" onClick={() => setIndex(i => i + 1)}>Avançar</button>
+            <Button className="flex-1" size="md" onClick={() => setIndex(i => i + 1)} disabled={!!busy}>Avançar</Button>
           )}
         </div>
       </div>

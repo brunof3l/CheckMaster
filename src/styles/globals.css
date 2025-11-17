@@ -1,0 +1,154 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cm-bg: #0b1324;
+  --cm-bg-soft: #111a33;
+  /* Texto padrão no tema claro: preto para máximo contraste */
+  --cm-text: #000000;
+  --cm-muted: #9aa3b2;
+  --cm-primary: #5b8cff;
+  --cm-success: #22c55e;
+  --cm-warning: #f59e0b;
+  --cm-danger: #ef4444;
+  --cm-info: #06b6d4;
+  /* tinted versions (20% opacity) for badges */
+  --cm-success-20: #22c55e33;
+  --cm-warning-20: #f59e0b33;
+  --cm-danger-20: #ef444433;
+  --cm-info-20: #06b6d433;
+}
+
+[data-theme="dark"] {
+  --cm-bg: #0b1324;
+  --cm-bg-soft: #0f1a33;
+  /* Texto padrão no tema escuro: branco para máximo contraste */
+  --cm-text: #ffffff;
+}
+
+.cm-card {@apply bg-white dark:bg-[color:var(--cm-bg-soft)] text-[color:var(--cm-text)] rounded-xl shadow-sm border border-gray-200/70 dark:border-white/5 p-4 transition-all duration-200 ease-out;}
+.cm-card:hover {@apply shadow-md;} 
+
+.cm-btn {@apply inline-flex items-center justify-center rounded-lg font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed;}
+.cm-btn-sm {@apply h-8 px-3 text-xs;}
+.cm-btn-md {@apply h-10 px-4 text-sm;}
+.cm-btn-lg {@apply h-12 px-6 text-base;}
+.cm-btn:hover { filter: brightness(1.05); }
+.cm-btn:active { filter: brightness(0.95); }
+.cm-btn-primary {@apply bg-[var(--cm-primary)] text-white shadow;} 
+.cm-btn-outline {@apply border border-white/20 bg-transparent text-[var(--cm-text)];}
+.cm-btn-success {@apply bg-[var(--cm-success)] text-white;}
+.cm-btn-warning {@apply bg-[var(--cm-warning)] text-black;}
+.cm-btn-danger {@apply bg-[var(--cm-danger)] text-white;}
+.cm-btn-ghost {@apply bg-transparent text-[var(--cm-text)] hover:bg-white/5;}
+.cm-btn-block {@apply w-full;}
+
+.cm-input {@apply w-full rounded-lg bg-white dark:bg-[var(--cm-bg)] border border-gray-300 dark:border-white/10 text-[color:var(--cm-text)] placeholder-gray-400 dark:placeholder-white/40 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--cm-primary)];}
+.cm-input--with-icon { @apply pl-10; }
+.cm-label {@apply block text-xs font-semibold text-gray-600 dark:text-white/70 mb-1;}
+.cm-field {@apply space-y-1;}
+.cm-error {@apply text-xs text-[color:var(--cm-danger)];}
+
+.cm-badge {@apply inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide;}
+.cm-badge-success {@apply bg-[var(--cm-success-20)] text-[var(--cm-success)];}
+.cm-badge-warning {@apply bg-[var(--cm-warning-20)] text-[var(--cm-warning)];}
+.cm-badge-danger {@apply bg-[var(--cm-danger-20)] text-[var(--cm-danger)];}
+.cm-badge-info {@apply bg-[var(--cm-info-20)] text-[var(--cm-info)];}
+
+.cm-steps {@apply flex items-center gap-2;}
+.cm-step {@apply flex items-center gap-2 text-xs px-2 py-1 rounded-full bg-white/50 dark:bg-white/10 text-gray-700 dark:text-white/70;} 
+.cm-step-active {@apply bg-[color:var(--cm-primary)] text-white;}
+
+.cm-table {@apply w-full border-collapse text-sm;} 
+.cm-table th {@apply bg-white dark:bg-[var(--cm-bg)] text-[color:var(--cm-text)] font-semibold text-xs uppercase tracking-wide border-b border-white/10 p-2;}
+.cm-table td {@apply border-b border-white/5 p-2 text-[color:var(--cm-text)];}
+
+.cm-modal-backdrop {@apply fixed inset-0 bg-black/50 backdrop-blur-sm;} 
+.cm-modal {@apply fixed inset-x-0 bottom-0 md:inset-0 md:m-auto md:max-w-xl md:h-fit bg-white dark:bg-[var(--cm-bg-soft)] rounded-t-xl md:rounded-xl shadow-xl p-4;} 
+
+.cm-skeleton {@apply animate-pulse bg-white/10 dark:bg-white/5 rounded;} 
+
+.animate-fade-in { animation: cm-fade-in 300ms ease-out both; }
+@keyframes cm-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* container helper */
+.container-m {@apply max-w-6xl mx-auto px-3;}
+
+/* Fundo em gradiente para app escuro único */
+.cm-app {
+  /* Imagem de fundo com overlay escuro. Coloque o arquivo em /public/bg-dark.jpg */
+  background-image: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)), url('/bg-dark.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* Botões com gradiente animado e glow suave */
+.cm-btn { @apply transition-transform duration-200; }
+.cm-btn:hover { transform: translateY(-1px) scale(1.01); }
+.cm-btn:active { transform: translateY(0) scale(0.99); }
+
+.cm-btn-primary:hover,
+.cm-btn-primary:focus-visible {
+  background-image: linear-gradient(135deg, #1f2937 0%, #2b3a59 40%, var(--cm-primary) 100%);
+  background-size: 200% 200%;
+  animation: cm-gradient 6s ease infinite;
+}
+.cm-btn-outline { @apply border border-white/20 bg-transparent text-[var(--cm-text)]; }
+
+@keyframes cm-gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Cards com leve glassmorphism no tema escuro */
+.cm-card { backdrop-filter: blur(6px); }
+/* versão escura translúcida para glassmorphism */
+.dark .cm-card { @apply bg-black/30 border-white/10; }
+
+/* toasts */
+.cm-toast-container { @apply fixed bottom-4 right-4 z-50 space-y-2; }
+.cm-toast { @apply cm-card shadow-lg p-3 animate-fade-in; }
+.cm-toast-title { @apply text-sm font-semibold; }
+.cm-toast-message { @apply text-xs; }
+
+/* --- 3D PUSH effect (palette preserved) --- */
+.fx-push {
+  position: relative;
+  transform: translateY(0);
+  transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease;
+  box-shadow: 0 8px 0 rgba(0,0,0,0.35), 0 10px 24px rgba(0,0,0,0.35);
+}
+.fx-push:hover {
+  transform: translateY(4px);
+  box-shadow: 0 4px 0 rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.35);
+}
+.fx-push:active {
+  transform: translateY(8px);
+  box-shadow: 0 0 0 rgba(0,0,0,0);
+  filter: brightness(0.98);
+}
+.dark .fx-push {
+  box-shadow: 0 8px 0 rgba(0,0,0,0.6), 0 10px 24px rgba(0,0,0,0.5);
+}
+
+/* Variant-specific gradients to preserve palette semantics */
+.cm-btn-primary.fx-push {
+  background-image: linear-gradient(135deg, color-mix(in hsl, var(--cm-primary) 85%, white 15%), var(--cm-primary));
+}
+.cm-btn-success.fx-push {
+  background-image: linear-gradient(135deg, color-mix(in hsl, var(--cm-success) 85%, white 15%), var(--cm-success));
+}
+.cm-btn-warning.fx-push {
+  background-image: linear-gradient(135deg, color-mix(in hsl, var(--cm-warning) 85%, white 15%), var(--cm-warning));
+}
+.cm-btn-danger.fx-push {
+  background-image: linear-gradient(135deg, color-mix(in hsl, var(--cm-danger) 85%, white 15%), var(--cm-danger));
+}
+/* Outline and ghost keep transparency but gain the 3D push movement */
+.cm-btn-outline.fx-push, .cm-btn-ghost.fx-push {
+  background-image: none;
+}

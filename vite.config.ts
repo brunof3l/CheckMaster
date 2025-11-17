@@ -3,6 +3,14 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  server: {
+    cors: {
+      // Permite apenas origens do app durante desenvolvimento
+      origin: (process.env.VITE_ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:5174')
+        .split(',')
+        .map(o => o.trim())
+    }
+  },
   plugins: [
     react(),
     VitePWA({

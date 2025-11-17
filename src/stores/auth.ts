@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { getFirebaseApp } from '../services/firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithEmailAndPassword, signOut as fbSignOut, sendPasswordResetEmail, signInWithPopup, createUserWithEmailAndPassword, onAuthStateChanged, updateProfile } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
+import { supabase } from '../config/supabase';
+import { signIn as sbSignIn, signUp as sbSignUp, signOut as sbSignOut, onAuthStateChange } from '../services/supabase/auth';
+import { useUIStore } from './ui';
 
 function authErrorToMessage(e: any) {
   const code = e?.code || '';
@@ -37,116 +37,127 @@ interface AuthState {
   resetPassword: (email: string) => Promise<void>;
   signInGoogle: () => Promise<boolean>;
   init: () => void;
+  refreshRole: () => Promise<void>;
+}
+
+// Canal Realtime para atualizar role em tempo real
+let roleChannel: any | null = null;
+function subscribeRole(userId: string) {
+  try {
+    // Evita canais duplicados
+    if (roleChannel) {
+      try { supabase.removeChannel(roleChannel); } catch {}
+      roleChannel = null;
+    }
+    roleChannel = supabase
+      .channel(`role-updates-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `id=eq.${userId}` }, (payload: any) => {
+        const newRole = (payload?.new as any)?.role;
+        if (newRole) {
+          (useAuthStore as any).setState({ role: newRole as Role });
+        }
+      })
+      .subscribe();
+  } catch {}
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   role: null,
   loading: false,
-  isConfigured: !!getFirebaseApp(),
+  isConfigured: true,
+  // Simple client-side rate limit for login attempts
+  _attempts: 0 as number,
+  _lockUntil: 0 as number,
   signIn: async (email, pass) => {
-    const app = getFirebaseApp();
-    if (!app) { alert('Firebase não configurado'); return false; }
+    const now = Date.now();
+    const { _attempts, _lockUntil } = (useAuthStore.getState() as any);
+    if (_lockUntil && now < _lockUntil) {
+      useUIStore.getState().pushToast({ title: 'Muitas tentativas', message: 'Login temporariamente bloqueado. Tente novamente em alguns minutos.', variant: 'warning' });
+      return false;
+    }
     set({ loading: true });
     try {
-      const auth = getAuth(app);
-      const res = await signInWithEmailAndPassword(auth, email, pass);
-      // Carrega papel (role) do Firestore, se existir
-      const db = getFirestore(app);
-      let role: Role = 'editor';
-      try {
-        const udoc = await getDoc(doc(db, 'users', res.user.uid));
-        role = (udoc.exists() ? (udoc.data() as any).role : 'editor');
-      } catch (_) {
-        // Sem permissões nas regras -> usa papel padrão e segue login
-        role = 'editor';
+      const { data, error } = await sbSignIn(email, pass);
+      if (error) throw error;
+      const usr = data?.user;
+      let r: Role = null;
+      if (usr) {
+        const { data: prof } = await supabase.from('users').select('role').eq('id', usr.id).single();
+        r = (prof?.role as Role) ?? 'editor';
       }
-      set({ user: { uid: res.user.uid, email: res.user.email }, role, loading: false });
-      return true;
+      set({ user: usr ? { uid: usr.id, email: usr.email } : null, role: r, loading: false, _attempts: 0, _lockUntil: 0 });
+      if (usr?.id) subscribeRole(usr.id);
+      return !!usr;
     } catch (e: any) {
-      alert(authErrorToMessage(e));
-      set({ loading: false });
+      useUIStore.getState().pushToast({ title: 'Erro de login', message: e.message || 'Erro de autenticação.', variant: 'danger' });
+      const attempts = (_attempts || 0) + 1;
+      const lock = attempts >= 5 ? Date.now() + 2 * 60 * 1000 : 0; // 5 tentativas → 2 min de bloqueio
+      set({ loading: false, _attempts: attempts, _lockUntil: lock });
       return false;
     }
   },
   signUp: async (email, pass, displayName) => {
-    const app = getFirebaseApp();
-    if (!app) { alert('Firebase não configurado'); return false; }
     set({ loading: true });
     try {
-      const auth = getAuth(app);
-      const db = getFirestore(app);
-      const res = await createUserWithEmailAndPassword(auth, email, pass);
-      if (displayName) {
-        await updateProfile(res.user, { displayName });
-      }
-      await setDoc(doc(db, 'users', res.user.uid), {
-        displayName: res.user.displayName || displayName || '',
-        email: res.user.email,
-        role: 'editor'
-      }, { merge: true });
-      set({ user: { uid: res.user.uid, email: res.user.email }, role: 'editor', loading: false });
-      return true;
+      const { data, error } = await sbSignUp(email, pass, displayName);
+      if (error) throw error;
+      const usr = data?.user;
+      set({ user: usr ? { uid: usr.id, email: usr.email } : null, role: 'editor', loading: false });
+      if (usr?.id) subscribeRole(usr.id);
+      return !!usr;
     } catch (e: any) {
-      alert(authErrorToMessage(e));
+      useUIStore.getState().pushToast({ title: 'Erro de cadastro', message: e.message || 'Erro de autenticação.', variant: 'danger' });
       set({ loading: false });
       return false;
     }
   },
   signOut: async () => {
-    const app = getFirebaseApp();
-    if (!app) return;
-    const auth = getAuth(app);
-    await fbSignOut(auth);
+    await sbSignOut();
     set({ user: null, role: null });
+    try { if (roleChannel) { supabase.removeChannel(roleChannel); roleChannel = null; } } catch {}
   },
   resetPassword: async (email) => {
-    const app = getFirebaseApp();
-    if (!app) { alert('Firebase não configurado'); return; }
-    const auth = getAuth(app);
-    await sendPasswordResetEmail(auth, email);
-    alert('E-mail de recuperação enviado');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    if (error) { useUIStore.getState().pushToast({ title: 'Erro ao enviar', message: error.message, variant: 'danger' }); return; }
+    useUIStore.getState().pushToast({ title: 'Recuperação enviada', message: 'Verifique seu e-mail.', variant: 'info' });
   },
   signInGoogle: async () => {
-    const app = getFirebaseApp();
-    if (!app) { alert('Firebase não configurado'); return false; }
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const provider = new GoogleAuthProvider();
-    try {
-      const res = await signInWithPopup(auth, provider);
-      // Garante doc em users com role padrão
-      const uref = doc(db, 'users', res.user.uid);
-      let role: Role = 'editor';
-      try {
-        const snap = await getDoc(uref);
-        if (!snap.exists()) {
-          await setDoc(uref, { displayName: res.user.displayName || '', email: res.user.email, role: 'editor' });
-        }
-        role = (snap.exists() ? (snap.data() as any).role : 'editor');
-      } catch (_) {
-        role = 'editor';
-      }
-      set({ user: { uid: res.user.uid, email: res.user.email }, role });
-      return true;
-    } catch (e: any) { alert(authErrorToMessage(e)); return false; }
+    useUIStore.getState().pushToast({ title: 'Indisponível', message: 'Google OAuth não configurado no Supabase.', variant: 'warning' });
+    return false;
   },
   init: () => {
-    const app = getFirebaseApp();
-    if (!app) return;
-    const auth = getAuth(app);
-    const db = getFirestore(app);
     set({ loading: true });
-    onAuthStateChanged(auth, async (usr) => {
-      if (!usr) { set({ user: null, role: null, loading: false }); return; }
-      let role: Role = 'editor';
-      try {
-        const udoc = await getDoc(doc(db, 'users', usr.uid));
-        role = (udoc.exists() ? (udoc.data() as any).role : 'editor');
-      } catch (_) {
-        role = 'editor';
-      }
-      set({ user: { uid: usr.uid, email: usr.email }, role, loading: false });
+    onAuthStateChange(async (evt) => {
+      const session = evt?.session || (await supabase.auth.getSession()).data.session;
+      const u = session?.user;
+      if (!u) { set({ user: null, role: null, loading: false }); return; }
+      let r: Role = null;
+      const { data: prof } = await supabase.from('users').select('role').eq('id', u.id).single();
+      r = (prof?.role as Role) ?? 'editor';
+      set({ user: { uid: u.id, email: u.email }, role: r, loading: false });
+      subscribeRole(u.id);
     });
+  },
+  refreshRole: async () => {
+    try {
+      const u = useAuthStore.getState().user;
+      if (!u?.uid) return;
+      const { data, error } = await supabase
+        .from('users')
+        .select('role, email, is_active')
+        .eq('id', u.uid)
+        .single();
+      if (error) {
+        useUIStore.getState().pushToast({ title: 'Erro ao atualizar papel', message: error.message || 'Falha ao consultar perfil.', variant: 'danger' });
+        return;
+      }
+      const r = (data?.role as Role) ?? null;
+      if (r) set({ role: r });
+      else {
+        useUIStore.getState().pushToast({ title: 'Papel não encontrado', message: 'Perfil sem role. Usando editor.', variant: 'warning' });
+      }
+      try { console.log('refreshRole result', data); } catch {}
+    } catch {}
   }
 }));

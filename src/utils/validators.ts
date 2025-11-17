@@ -16,3 +16,7 @@ export function isValidPlateMercosul(plate: string) {
   const p = plate.toUpperCase();
   return /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(p);
 }
+
+export function isValidUUID(v: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+}
