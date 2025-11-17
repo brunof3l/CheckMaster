@@ -156,6 +156,13 @@ do $$ begin
   exception when duplicate_object then null; end;
 
   begin
+    -- Qualquer usuário autenticado pode inserir checklist; exigimos ownership via created_by
+    drop policy if exists checklists_insert_owner on public.checklists;
+    create policy checklists_insert_owner on public.checklists
+    for insert to authenticated with check (created_by = auth.uid());
+  exception when duplicate_object then null; end;
+
+  begin
     create policy checklists_update_unlocked on public.checklists
     for update to authenticated using (is_locked = false) with check (is_locked = false);
   exception when duplicate_object then null; end;
@@ -174,10 +181,10 @@ do $$ begin
   exception when duplicate_object then null; end;
 
   begin
-    create policy suppliers_write_roles on public.suppliers
-    for insert to authenticated with check (
-      exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','editor'))
-    );
+    -- Permitir INSERT por qualquer usuário autenticado
+    drop policy if exists suppliers_write_roles on public.suppliers;
+    create policy suppliers_insert_any on public.suppliers
+    for insert to authenticated with check (true);
   exception when duplicate_object then null; end;
 
   begin
@@ -201,10 +208,10 @@ do $$ begin
   exception when duplicate_object then null; end;
 
   begin
-    create policy vehicles_write_roles on public.vehicles
-    for insert to authenticated with check (
-      exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','editor'))
-    );
+    -- Permitir INSERT por qualquer usuário autenticado
+    drop policy if exists vehicles_write_roles on public.vehicles;
+    create policy vehicles_insert_any on public.vehicles
+    for insert to authenticated with check (true);
   exception when duplicate_object then null; end;
 
   begin
