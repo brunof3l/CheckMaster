@@ -29,17 +29,28 @@ export function AdminPage() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [vRes, sRes, cRes, uRes] = await Promise.all([listVehicles(), listSuppliers(), listChecklists(), listAppUsers()]);
-      if (vRes.error) throw vRes.error;
-      if (sRes.error) throw sRes.error;
-      if (cRes.error) throw cRes.error;
-      if (uRes.error) throw uRes.error;
-      setVehicles(vRes.data || []);
-      setSuppliers(sRes.data || []);
-      setChecklists(cRes.data || []);
-      setUsers(uRes.data || []);
-    } catch (e: any) {
-      pushToast({ title: 'Erro ao carregar', message: e.message, variant: 'danger' });
+      const results = await Promise.allSettled([listVehicles(), listSuppliers(), listChecklists(), listAppUsers()]);
+      const [vRes, sRes, cRes, uRes] = results;
+      if (vRes.status === 'fulfilled') {
+        const r = vRes.value as any; if (!r.error) setVehicles(r.data || []); else pushToast({ title: 'Veículos', message: r.error.message, variant: 'danger' });
+      } else {
+        pushToast({ title: 'Veículos', message: (vRes.reason?.message || 'Falha ao carregar'), variant: 'danger' });
+      }
+      if (sRes.status === 'fulfilled') {
+        const r = sRes.value as any; if (!r.error) setSuppliers(r.data || []); else pushToast({ title: 'Fornecedores', message: r.error.message, variant: 'danger' });
+      } else {
+        pushToast({ title: 'Fornecedores', message: (sRes.reason?.message || 'Falha ao carregar'), variant: 'danger' });
+      }
+      if (cRes.status === 'fulfilled') {
+        const r = cRes.value as any; if (!r.error) setChecklists(r.data || []); else pushToast({ title: 'Checklists', message: r.error.message, variant: 'danger' });
+      } else {
+        pushToast({ title: 'Checklists', message: (cRes.reason?.message || 'Falha ao carregar'), variant: 'danger' });
+      }
+      if (uRes.status === 'fulfilled') {
+        const r = uRes.value as any; if (!r.error) setUsers(r.data || []); else pushToast({ title: 'Usuários', message: r.error.message, variant: 'danger' });
+      } else {
+        pushToast({ title: 'Usuários', message: (uRes.reason?.message || 'Falha ao carregar'), variant: 'danger' });
+      }
     } finally { setLoading(false); }
   };
 
