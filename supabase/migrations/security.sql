@@ -137,9 +137,17 @@ alter table if exists public.vehicles enable row level security;
 
 -- 2.1) Grants: garantir privilégios básicos para o papel 'authenticated'
 do $$ begin
+  -- Grants para usuários autenticados
   grant usage on schema public to authenticated;
   grant select, update, delete on table public.users to authenticated;
   grant select on table public.checklists, public.suppliers, public.vehicles to authenticated;
+
+  -- Grants para service_role (bypass RLS, mas ainda requer privilégios)
+  grant usage on schema public to service_role;
+  grant select, insert, update, delete on table public.users to service_role;
+  grant select, insert, update, delete on table public.checklists to service_role;
+  grant select, insert, update, delete on table public.suppliers to service_role;
+  grant select, insert, update, delete on table public.vehicles to service_role;
 exception when others then null; end $$;
 
 -- 3) Policies (com tolerância a duplicate_object)

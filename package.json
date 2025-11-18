@@ -9,7 +9,11 @@
     "preview": "vite preview",
     "test": "vitest",
     "reset:auth": "node scripts/reset-auth.mjs",
-    "reset:storage": "node scripts/reset-storage.mjs"
+    "reset:storage": "node scripts/reset-storage.mjs",
+    "user:purge": "node scripts/manage-user.mjs purge --email",
+    "user:reactivate": "node scripts/manage-user.mjs reactivate --email",
+    "user:deactivate": "node scripts/manage-user.mjs deactivate --email",
+    "user:status": "node scripts/manage-user.mjs status --email"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

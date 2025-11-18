@@ -56,6 +56,47 @@ export function AdminPage() {
 
   useEffect(() => { loadAll(); }, []);
 
+  // Assinatura Realtime para refletir novos usuários imediatamente no painel
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-users')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload: any) => {
+        setUsers(prev => {
+          const next = [...prev];
+          const newRow = (payload?.new as any) || null;
+          const oldRow = (payload?.old as any) || null;
+          const id = (newRow?.id || oldRow?.id);
+          const idx = next.findIndex(u => u.id === id);
+          const evt = String((payload as any)?.eventType || '').toUpperCase();
+
+          if (evt === 'INSERT') {
+            // Respeita a visualização padrão (apenas ativos) do listAppUsers
+            if (newRow && newRow.is_active === false) return prev;
+            if (idx >= 0) { next[idx] = newRow; return next; }
+            return [newRow, ...next];
+          }
+          if (evt === 'UPDATE') {
+            // Se ficou inativo, remove da lista padrão; senão atualiza/adiciona
+            if (newRow && newRow.is_active === false) {
+              if (idx >= 0) { next.splice(idx, 1); }
+              return next;
+            }
+            if (idx >= 0) { next[idx] = newRow; return next; }
+            if (newRow) return [newRow, ...next];
+            return next;
+          }
+          if (evt === 'DELETE') {
+            if (idx >= 0) { next.splice(idx, 1); }
+            return next;
+          }
+          return prev;
+        });
+      })
+      .subscribe();
+
+    return () => { try { supabase.removeChannel(channel); } catch {} };
+  }, []);
+
   const getSupplierName = (s: any) => {
     const candidates = [s.nome, s.razaosocial, s.razaoSocial, s.razao_social, s.name, s.nomeFantasia, s['nome_fantasia']];
     for (const v of candidates) {
