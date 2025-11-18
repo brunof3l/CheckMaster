@@ -121,27 +121,31 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { data, error } = await sbSignIn(email, pass);
       if (error) throw error;
       const usr = data?.user;
-      // Garante perfil na tabela public.users (id/email/display_name)
-      try {
-        if (usr?.id) {
-          const profile = { id: usr.id, email: usr.email, display_name: (usr.user_metadata as any)?.displayName || (usr.email || '')?.split('@')[0] } as any;
-          // Upsert com conflito em id; se update não for permitido, insert garantirá novo registro
-          const up = await supabase.from('users').upsert(profile, { onConflict: 'id' });
-          const msg = up.error?.message || '';
-          // Ignora erros de coluna inexistente (ex.: display_name) e segue
-          if (up.error && !/column\s+"?display_name"?\s+does\s+not\s+exist/i.test(msg)) {
-            throw up.error;
-          }
+      // Verifica se existe perfil e se está ativo; não recria automaticamente
+      if (usr?.id) {
+        const { data: prof, error: profErr } = await supabase
+          .from('users')
+          .select('role, is_active')
+          .eq('id', usr.id)
+          .single();
+        // Se não existir perfil ou estiver inativo, bloqueia acesso
+        if (profErr || !prof || (prof as any)?.is_active === false) {
+          await sbSignOut();
+          set({ user: null, role: null, loading: false });
+          useUIStore.getState().pushToast({
+            title: 'Acesso bloqueado',
+            message: 'Usuário removido ou inativo. Contate o administrador.',
+            variant: 'danger',
+          });
+          return false;
         }
-      } catch {}
-      let r: Role = null;
-      if (usr) {
-        const { data: prof } = await supabase.from('users').select('role').eq('id', usr.id).single();
-        r = (prof?.role as Role) ?? 'editor';
+        const r = (prof?.role as Role) ?? 'editor';
+        set({ user: { uid: usr.id, email: usr.email }, role: r, loading: false, _attempts: 0, _lockUntil: 0 });
+        subscribeRole(usr.id);
+        return true;
       }
-      set({ user: usr ? { uid: usr.id, email: usr.email } : null, role: r, loading: false, _attempts: 0, _lockUntil: 0 });
-      if (usr?.id) subscribeRole(usr.id);
-      return !!usr;
+      set({ user: null, role: null, loading: false, _attempts: 0, _lockUntil: 0 });
+      return false;
     } catch (e: any) {
       useUIStore.getState().pushToast({ title: 'Erro de login', message: e.message || 'Erro de autenticação.', variant: 'danger' });
       const attempts = (_attempts || 0) + 1;
@@ -209,18 +213,18 @@ export const useAuthStore = create<AuthState>((set) => ({
       const session = evt || (await supabase.auth.getSession()).data.session;
       const u = (session as any)?.user;
       if (!u) { set({ user: null, role: null, loading: false }); return; }
-      // Garante perfil ao iniciar sessão
-      try {
-        const profile = { id: u.id, email: u.email, display_name: (u.user_metadata as any)?.displayName || (u.email || '')?.split('@')[0] } as any;
-        const up = await supabase.from('users').upsert(profile, { onConflict: 'id' });
-        const msg = up.error?.message || '';
-        if (up.error && !/column\s+"?display_name"?\s+does\s+not\s+exist/i.test(msg)) {
-          // Se falhar por outra razão, prossegue sem travar init
-        }
-      } catch {}
-      let r: Role = null;
-      const { data: prof } = await supabase.from('users').select('role').eq('id', u.id).single();
-      r = (prof?.role as Role) ?? 'editor';
+      // Não recriar perfil automaticamente; verificar se perfil existe e está ativo
+      const { data: prof, error: profErr } = await supabase
+        .from('users')
+        .select('role, is_active')
+        .eq('id', u.id)
+        .single();
+      if (profErr || !prof || (prof as any)?.is_active === false) {
+        await (useAuthStore.getState().signOut)();
+        useUIStore.getState().pushToast({ title: 'Acesso bloqueado', message: 'Usuário removido ou inativo. Contate o administrador.', variant: 'danger' });
+        return;
+      }
+      const r: Role = (prof?.role as Role) ?? 'editor';
       set({ user: { uid: u.id, email: u.email }, role: r, loading: false });
       subscribeRole(u.id);
       // Inatividade: se já passou 1h sem atividade, deslogar; caso contrário, iniciar relógio
@@ -249,6 +253,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         .single();
       if (error) {
         useUIStore.getState().pushToast({ title: 'Erro ao atualizar papel', message: error.message || 'Falha ao consultar perfil.', variant: 'danger' });
+        return;
+      }
+      if ((data as any)?.is_active === false) {
+        await (useAuthStore.getState().signOut)();
+        useUIStore.getState().pushToast({ title: 'Sessão encerrada', message: 'Seu usuário está inativo. Contate o administrador.', variant: 'warning' });
         return;
       }
       const r = (data?.role as Role) ?? null;

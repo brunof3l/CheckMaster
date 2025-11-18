@@ -321,3 +321,134 @@ order by tablename, policyname;
 -- 1) INSERT (authenticated): Using/With Check: bucket_id = 'checklists'
 -- 2) SELECT (authenticated): Using: bucket_id = 'checklists'
 -- 3) DELETE (authenticated): Using: bucket_id = 'checklists' AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'admin')
+
+-- 7) Active user access policies (aplicar checagem de is_active em tabelas de negócio)
+-- Este bloco é idempotente e pode ser executado no SQL Editor.
+
+-- 7.1) Garantir coluna de atividade no perfil
+alter table if exists public.users add column if not exists is_active boolean default true;
+
+-- 7.2) Função helper para checar usuário ativo
+create or replace function public.is_active_user()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.users u where u.id = auth.uid() and coalesce(u.is_active, true)
+  );
+$$;
+
+-- 7.3) Recriar policies com checagem de usuário ativo
+do $$ begin
+  -- suppliers
+  begin
+    drop policy if exists suppliers_read_any on public.suppliers;
+    drop policy if exists suppliers_read_active on public.suppliers;
+    create policy suppliers_read_active on public.suppliers
+    for select to authenticated using (public.is_active_user());
+  exception when duplicate_object then null; end;
+
+  begin
+    drop policy if exists suppliers_insert_any on public.suppliers;
+    drop policy if exists suppliers_insert_active on public.suppliers;
+    create policy suppliers_insert_active on public.suppliers
+    for insert to authenticated with check (public.is_active_user());
+  exception when duplicate_object then null; end;
+
+  begin
+    drop policy if exists suppliers_update_roles on public.suppliers;
+    drop policy if exists suppliers_update_roles_active on public.suppliers;
+    create policy suppliers_update_roles_active on public.suppliers
+    for update to authenticated using (
+      public.is_active_user() and exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','editor'))
+    ) with check (
+      public.is_active_user() and exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','editor'))
+    );
+  exception when duplicate_object then null; end;
+
+  begin
+    drop policy if exists suppliers_delete_admin on public.suppliers;
+    drop policy if exists suppliers_delete_admin_active on public.suppliers;
+    create policy suppliers_delete_admin_active on public.suppliers
+    for delete to authenticated using (
+      public.is_active_user() and exists (select 1 from public.users u where u.id = auth.uid() and u.role = 'admin')
+    );
+  exception when duplicate_object then null; end;
+
+  -- vehicles
+  begin
+    drop policy if exists vehicles_read_any on public.vehicles;
+    drop policy if exists vehicles_read_active on public.vehicles;
+    create policy vehicles_read_active on public.vehicles
+    for select to authenticated using (public.is_active_user());
+  exception when duplicate_object then null; end;
+
+  begin
+    drop policy if exists vehicles_insert_any on public.vehicles;
+    drop policy if exists vehicles_insert_active on public.vehicles;
+    create policy vehicles_insert_active on public.vehicles
+    for insert to authenticated with check (public.is_active_user());
+  exception when duplicate_object then null; end;
+
+  begin
+    drop policy if exists vehicles_update_roles on public.vehicles;
+    drop policy if exists vehicles_update_roles_active on public.vehicles;
+    create policy vehicles_update_roles_active on public.vehicles
+    for update to authenticated using (
+      public.is_active_user() and exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','editor'))
+    ) with check (
+      public.is_active_user() and exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','editor'))
+    );
+  exception when duplicate_object then null; end;
+
+  begin
+    drop policy if exists vehicles_delete_admin on public.vehicles;
+    drop policy if exists vehicles_delete_admin_active on public.vehicles;
+    create policy vehicles_delete_admin_active on public.vehicles
+    for delete to authenticated using (
+      public.is_active_user() and exists (select 1 from public.users u where u.id = auth.uid() and u.role = 'admin')
+    );
+  exception when duplicate_object then null; end;
+
+  -- checklists
+  begin
+    drop policy if exists checklists_read_any on public.checklists;
+    drop policy if exists checklists_read_active on public.checklists;
+    create policy checklists_read_active on public.checklists
+    for select to authenticated using (public.is_active_user());
+  exception when duplicate_object then null; end;
+
+  begin
+    drop policy if exists checklists_insert_owner on public.checklists;
+    drop policy if exists checklists_insert_owner_active on public.checklists;
+    create policy checklists_insert_owner_active on public.checklists
+    for insert to authenticated with check (public.is_active_user() and created_by = auth.uid());
+  exception when duplicate_object then null; end;
+
+  begin
+    drop policy if exists checklists_update_unlocked on public.checklists;
+    drop policy if exists checklists_update_unlocked_active on public.checklists;
+    create policy checklists_update_unlocked_active on public.checklists
+    for update to authenticated using (public.is_active_user() and is_locked = false)
+    with check (public.is_active_user() and is_locked = false);
+  exception when duplicate_object then null; end;
+
+  begin
+    drop policy if exists checklists_delete_admin on public.checklists;
+    drop policy if exists checklists_delete_admin_active on public.checklists;
+    create policy checklists_delete_admin_active on public.checklists
+    for delete to authenticated using (
+      public.is_active_user() and exists (select 1 from public.users u where u.id = auth.uid() and u.role = 'admin')
+    );
+  exception when duplicate_object then null; end;
+end $$;
+
+-- 7.4) Conferência das novas policies
+select schemaname, tablename, policyname
+from pg_policies
+where schemaname='public'
+  and tablename in ('checklists','suppliers','vehicles')
+order by tablename, policyname;
