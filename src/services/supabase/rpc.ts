@@ -7,7 +7,8 @@ export async function getNextChecklistSeq() {
 }
 
 export async function getCnpjData(cnpj: string) {
-  const { data, error } = await supabase.rpc('getCnpjData', { cnpj });
+  // A função SQL define o parâmetro como p_cnpj; usar o mesmo nome evita erro de argumento.
+  const { data, error } = await supabase.rpc('getCnpjData', { p_cnpj: cnpj });
   if (error) throw error;
   return data;
 }

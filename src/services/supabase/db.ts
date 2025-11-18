@@ -92,40 +92,22 @@ export async function insertSupplier(d: any) {
     }
   }
 
-  const base = {
+  // Monta payload completo em uma única inserção para evitar UPDATE pós-inserção,
+  // que pode ser bloqueado por RLS para papéis sem privilégio de edição.
+  const payload: any = {
     cnpj: cnpjDigits,
-    // Telefones e e-mails passam por sanitização leve (remoção de tags) e trim
     telefone: norm(d.telefone),
-    email: norm(d.email)
-  } as any;
-  // Prioriza salvar na coluna minúscula (razaosocial) para compatibilidade com o schema do Postgres
-  const withRazao = { ...base, razaosocial: norm(d.razaoSocial ?? d.razaosocial ?? d.nome) } as any;
-  const withNome = { ...base, nome: norm(d.nome ?? d.razaoSocial ?? d.razaosocial) } as any;
+    email: norm(d.email),
+    // O schema padrão usa camelCase `razaoSocial` e também possui `nome`.
+    // Preenche ambos quando disponíveis para maximizar compatibilidade sem precisar de UPDATE.
+    razaoSocial: norm(d.razaoSocial ?? d.razaosocial ?? d.nome ?? nameCandidate),
+    nome: norm(d.nome ?? d.razaoSocial ?? d.razaosocial ?? nameCandidate)
+  };
 
-  // Tenta com razaoSocial primeiro; se a coluna não existir, tenta com nome; por fim, insere somente base.
-  let res = await supabase.from('suppliers').insert([withRazao]).select().single();
-  if (res.error && /razaoSocial|razaosocial/i.test(res.error.message)) {
-    res = await supabase.from('suppliers').insert([withNome]).select().single();
-  }
-  if (res.error && /nome/i.test(res.error.message)) {
-    res = await supabase.from('suppliers').insert([base]).select().single();
-  }
-  // Após inserir, tenta garantir que pelo menos uma coluna de nome esteja populada
-  try {
-    const id = (res.data as any)?.id;
-    const nameVal = nameCandidate || norm(d.nome) || norm(d.razaoSocial) || norm(d.razaosocial);
-    if (id && nameVal) {
-      // Atualiza ambas, ignorando erro se coluna não existir
-      const upNome = await supabase.from('suppliers').update({ nome: nameVal }).eq('id', id);
-      if (upNome.error && !/column "nome".*does not exist/i.test(upNome.error.message)) {
-        throw upNome.error;
-      }
-      const upRazao = await supabase.from('suppliers').update({ razaosocial: nameVal }).eq('id', id);
-      if (upRazao.error && !/column "razaosocial".*does not exist/i.test(upRazao.error.message)) {
-        throw upRazao.error;
-      }
-    }
-  } catch {}
+  // Remove chaves com null para evitar conflitos em bancos sem determinadas colunas
+  Object.keys(payload).forEach(k => { if (payload[k] === null) delete payload[k]; });
+
+  const res = await supabase.from('suppliers').insert([payload]).select().single();
   return res;
 }
 
