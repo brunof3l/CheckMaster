@@ -108,6 +108,18 @@ export async function insertSupplier(d: any) {
   Object.keys(payload).forEach(k => { if (payload[k] === null) delete payload[k]; });
 
   const res = await supabase.from('suppliers').insert([payload]).select().single();
+  // Fallback: alguns bancos usam snake_case "razaosocial" ou o cache de schema pode não conhecer "razaoSocial"
+  const msg = res.error?.message || '';
+  const schemaCacheErr = /could not find the 'razaoSocial' column of 'suppliers' in the schema cache/i.test(msg);
+  const pgNoColumnErr = /column\s+"?razaoSocial"?\s+.*does\s+not\s+exist/i.test(msg);
+  if (res.error && (schemaCacheErr || pgNoColumnErr)) {
+    const { razaoSocial, ...rest } = payload as any;
+    const altPayload: any = { ...rest };
+    if (razaoSocial !== undefined && razaoSocial !== null) {
+      altPayload.razaosocial = razaoSocial;
+    }
+    return await supabase.from('suppliers').insert([altPayload]).select().single();
+  }
   return res;
 }
 
