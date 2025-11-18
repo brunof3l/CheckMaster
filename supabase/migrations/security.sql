@@ -43,6 +43,37 @@ begin
 end;
 $$;
 
+-- Fallback de CNPJ: retorna dados básicos a partir de cadastro local de fornecedores
+drop function if exists public.getCnpjData(text);
+create or replace function public.getCnpjData(p_cnpj text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare result jsonb;
+begin
+  -- Normalizar dígitos do parâmetro
+  if p_cnpj is null then
+    return null;
+  end if;
+  -- Buscar em suppliers por CNPJ (somente dígitos)
+  select jsonb_build_object(
+    'cnpj', s.cnpj,
+    'razaoSocial', coalesce(s.razaoSocial, s.razaosocial),
+    'nomeFantasia', s.nome,
+    'endereco', jsonb_build_object('logradouro', null),
+    'telefone', s.telefone,
+    'email', s.email
+  ) into result
+  from public.suppliers s
+  where regexp_replace(coalesce(s.cnpj, ''), '\\D', '', 'g') = p_cnpj
+  limit 1;
+  return result;
+end;
+$$;
+
 drop function if exists public.reopen_checklist(uuid, uuid);
 create or replace function public.reopen_checklist(chk_id uuid, user_id uuid)
 returns jsonb

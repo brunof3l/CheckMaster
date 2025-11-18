@@ -59,12 +59,13 @@ export function useCnpjService() {
       const cached = await getCnpjData(digits);
       return cached as CnpjResult;
     } catch (e: any) {
-      // Em caso de erro geral, ainda tentar o fallback RPC
+      // Em caso de erro geral, ainda tentar o fallback RPC e evitar toasts duplicados.
       try {
         const cached = await getCnpjData(digits);
         if (cached) return cached as CnpjResult;
       } catch {}
-      useUIStore.getState().pushToast({ title: 'Erro CNPJ', message: e?.message || 'Falha ao consultar CNPJ', variant: 'danger' });
+      // Registrar no console para diagnóstico sem poluir UI com toasts duplicados
+      console.warn('CNPJ lookup falhou:', e?.message || e);
       return null;
     } finally {
       setLoading(false);
