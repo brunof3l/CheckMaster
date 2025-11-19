@@ -20,6 +20,35 @@ Aplicação web responsiva construída com React + TypeScript + Vite, Tailwind C
    - `npm install`
    - `npm run dev`
 
+## Deploy (GitHub Pages)
+
+Este projeto está configurado para deploy automático no GitHub Pages via GitHub Actions.
+
+### Passos
+
+1. Configure os secrets do repositório (Settings → Secrets and variables → Actions):
+   - `VITE_SUPABASE_URL` — URL do Supabase.
+   - `VITE_SUPABASE_ANON_KEY` — chave anon pública do Supabase.
+
+2. (Opcional) Se usar domínio próprio (sem `/CheckMaster/` no caminho), defina `VITE_BASE_PATH` como `/` nos Secrets e ajuste DNS.
+
+3. No Supabase (Auth → Settings):
+   - `Site URL` deve incluir a URL do GitHub Pages, por exemplo: `https://<seu-usuario>.github.io/CheckMaster/`.
+   - `Additional Redirect URLs` deve incluir a mesma URL para fluxos de reset/magic link.
+
+4. Push na branch `main` dispara o workflow `.github/workflows/deploy.yml` que:
+   - Instala dependências
+   - Compila com `npm run build`
+   - Publica `dist/` no GitHub Pages, incluindo fallback `404.html` para SPA
+
+### Acesso
+
+Após o primeiro deploy, o site ficará disponível em:
+
+`https://<seu-usuario>.github.io/CheckMaster/`
+
+Para domínio próprio, defina `VITE_BASE_PATH=/` e atualize as configurações do Pages.
+
 ## Reset do projeto (zerar banco, usuários e storage)
 - Aviso: operação destrutiva. Faça backup antes.
 

@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // Base para deploy em GitHub Pages (project page)
+  // Permite override via VITE_BASE_PATH quando usar domínio próprio
+  base: process.env.VITE_BASE_PATH || '/CheckMaster/',
   server: {
     cors: {
       // Permite apenas origens do app durante desenvolvimento
