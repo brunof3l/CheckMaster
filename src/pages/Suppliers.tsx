@@ -93,6 +93,12 @@ export function SuppliersPage() {
     }
     return '';
   };
+  const toWhatsLink = (tel: any) => {
+    const digits = String(tel || '').replace(/\D/g, '');
+    if (!digits) return '';
+    const withCountry = digits.startsWith('55') ? digits : `55${digits}`;
+    return `https://wa.me/${withCountry}`;
+  };
   return (
     <div className="space-y-3 py-3">
       <Card title={<span className="inline-flex items-center gap-2"><Store size={16} /> Cadastrar fornecedor</span> as any}>
@@ -142,7 +148,14 @@ export function SuppliersPage() {
                   <ul className="divide-y">
                     {visible.map(s => (
                       <li key={s.id} className="py-2 text-xs">
-                        {getSupplierName(s) || 'Sem nome'} • {(s.cnpj || '—')}{s.telefone ? ` • ${s.telefone}` : ''}
+                        {getSupplierName(s) || 'Sem nome'} • {(s.cnpj || '—')}{s.telefone ? (
+                          <>
+                            {' • '}
+                            <a href={toWhatsLink(s.telefone)} target="_blank" rel="noreferrer" title="Abrir no WhatsApp">
+                              {String(s.telefone)}
+                            </a>
+                          </>
+                        ) : ''}
                       </li>
                     ))}
                   </ul>
