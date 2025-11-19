@@ -39,7 +39,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
-  const { register, control, handleSubmit, setValue, watch } = useForm<FormData>({
+  const { register, control, handleSubmit, setValue, watch, setFocus } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       defectItems: [],
@@ -260,6 +260,22 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       pushToast({ title: 'Erro ao salvar', message: msg + hint, variant: 'danger' });
     }
     finally { setSubmitting(false); }
+  }, (errors) => {
+    // Feedback quando a validação falha (sem chamar o submit)
+    const missing: string[] = [];
+    if (errors.plateId) missing.push('Placa');
+    if (errors.service) missing.push('Serviço');
+    if (errors.odometer) missing.push('KM');
+    if (errors.supplierId) missing.push('Fornecedor');
+    if (errors.responsible) missing.push('Responsável');
+    const msg = missing.length ? `Preencha: ${missing.join(', ')}.` : 'Verifique os campos obrigatórios.';
+    pushToast({ title: 'Campos obrigatórios', message: msg, variant: 'warning' });
+    // Focar no primeiro campo faltante para melhorar UX
+    if (errors.plateId) setFocus('plateId');
+    else if (errors.service) setFocus('service');
+    else if (errors.odometer) setFocus('odometer');
+    else if (errors.supplierId) setFocus('supplierId');
+    else if (errors.responsible) setFocus('responsible');
   });
 
   const Steps = [
