@@ -5,7 +5,7 @@ import { Wizard } from '../../components/Wizard';
 import { Stepper } from '../../components/ui/Stepper';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import imageCompression from 'browser-image-compression';
+// Removido: compressão automática de imagens para permitir anexos grandes
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../config/supabase';
 import { insertChecklist, updateChecklist, listVehicles, listSuppliers } from '../../services/supabase/db';
@@ -197,14 +197,9 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       for (const f of data.media || []) {
         const allowed = ['image/jpeg', 'image/png'];
         if (!allowed.includes((f as File).type)) throw new Error('Apenas imagens JPEG/PNG são permitidas.');
-        if ((f as File).size > 5 * 1024 * 1024) throw new Error('Arquivo excede 5MB.');
-        let toUpload: File = f as File;
-        try {
-          const blob = await imageCompression(f as File, { maxSizeMB: 0.8, maxWidthOrHeight: 1600, useWebWorker: true });
-          toUpload = new File([blob as Blob], (f as File).name, { type: (blob as Blob).type || (f as File).type });
-        } catch {}
+        const toUpload: File = f as File;
         const ext = (toUpload.name.split('.').pop() || 'jpg');
-      const name = `${id}/${crypto.randomUUID()}.${ext}`;
+        const name = `${id}/${crypto.randomUUID()}.${ext}`;
         const { error } = await supabase.storage.from('checklists').upload(name, toUpload);
         if (error) throw error;
         const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(name, 3600);
@@ -219,10 +214,9 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         const mime = (f as File).type || '';
         const allowedBudget = ['application/pdf','image/jpeg','image/png'];
         if (!allowedBudget.includes(mime)) throw new Error('Anexos permitidos: PDF/JPEG/PNG.');
-        if ((f as File).size > 5 * 1024 * 1024) throw new Error('Anexo excede 5MB.');
         const name = (f as File)?.name || 'anexo';
         const ext = name.includes('.') ? name.split('.').pop() : 'bin';
-      const path = `${id}/budget-${crypto.randomUUID()}.${ext}`;
+        const path = `${id}/budget-${crypto.randomUUID()}.${ext}`;
         const { error } = await supabase.storage.from('checklists').upload(path, f as File);
         if (error) throw error;
         budgetAttachments.push({ type: 'budget', path, name, createdAt: Date.now() });
@@ -231,17 +225,17 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       // fotos do marcador de combustível (entrada/saída)
       const fuelGaugePhotos: any = {};
       if ((data as any).fuelGaugeEntry) {
-      const entryF = (data as any).fuelGaugeEntry as File;
-      if (!['image/jpeg','image/png'].includes(entryF.type) || entryF.size > 5 * 1024 * 1024) throw new Error('Foto de combustível inválida.');
-      const path = `${id}/fuel-entry-${crypto.randomUUID()}.jpg`;
+        const entryF = (data as any).fuelGaugeEntry as File;
+        if (!['image/jpeg','image/png'].includes(entryF.type)) throw new Error('Foto de combustível inválida.');
+        const path = `${id}/fuel-entry-${crypto.randomUUID()}.jpg`;
         const { error } = await supabase.storage.from('checklists').upload(path, entryF);
         if (error) throw error;
         fuelGaugePhotos.entry = path;
       }
       if ((data as any).fuelGaugeExit) {
-      const exitF = (data as any).fuelGaugeExit as File;
-      if (!['image/jpeg','image/png'].includes(exitF.type) || exitF.size > 5 * 1024 * 1024) throw new Error('Foto de combustível inválida.');
-      const path = `${id}/fuel-exit-${crypto.randomUUID()}.jpg`;
+        const exitF = (data as any).fuelGaugeExit as File;
+        if (!['image/jpeg','image/png'].includes(exitF.type)) throw new Error('Foto de combustível inválida.');
+        const path = `${id}/fuel-exit-${crypto.randomUUID()}.jpg`;
         const { error } = await supabase.storage.from('checklists').upload(path, exitF);
         if (error) throw error;
         fuelGaugePhotos.exit = path;

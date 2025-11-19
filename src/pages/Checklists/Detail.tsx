@@ -131,7 +131,6 @@ export function ChecklistDetail() {
       for (const f of mediaSelection) {
         const allowed = ['image/jpeg', 'image/png'];
         if (!allowed.includes(f.type)) { throw new Error('Apenas imagens JPEG/PNG são permitidas.'); }
-        if (f.size > 5 * 1024 * 1024) { throw new Error('Arquivo excede 5MB.'); }
         const ext = f.name.split('.').pop() || 'jpg';
         const name = `${id}/${crypto.randomUUID()}.${ext}`;
         const { error } = await supabase.storage.from('checklists').upload(name, f);

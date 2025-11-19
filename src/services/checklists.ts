@@ -28,7 +28,7 @@ export async function getChecklist(id: string) {
 
 export async function setInProgress(id: string) {
   // When opening a draft, move to in_progress and set started_at
-  const { error } = await supabase.from('checklists').update({ status: 'em_andamento', started_at: new Date().toISOString() }).eq('id', id);
+  const { error } = await supabase.from('checklists').update({ status: 'em_andamento', started_at: new Date().toISOString(), is_locked: false }).eq('id', id);
   if (error) throw error;
 }
 
