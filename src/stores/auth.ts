@@ -237,8 +237,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   init: () => {
     set({ loading: true });
-    onAuthStateChange(async (evt) => {
-      const session = evt || (await supabase.auth.getSession()).data.session;
+    onAuthStateChange(async (event, sessionFromEvent) => {
+      const session = sessionFromEvent || (await supabase.auth.getSession()).data.session;
       const u = (session as any)?.user;
       if (!u) { set({ user: null, role: null, loading: false }); return; }
       // Não recriar perfil automaticamente; verificar se perfil existe e está ativo
@@ -255,9 +255,11 @@ export const useAuthStore = create<AuthState>((set) => ({
       const r: Role = (prof?.role as Role) ?? 'editor';
       set({ user: { uid: u.id, email: u.email }, role: r, loading: false });
       subscribeRole(u.id);
-      // Inatividade: se já passou 1h sem atividade, deslogar; caso contrário, iniciar relógio
+      // Inatividade: após login bem-sucedido (SIGNED_IN), sempre considera atividade recente
       const last = Number(localStorage.getItem(LAST_ACTIVE_KEY) || '0');
-      if (!last) {
+      if (event === 'SIGNED_IN') {
+        touchActivity();
+      } else if (!last) {
         touchActivity(); // considera o boot como atividade
       } else if (Date.now() - last >= INACTIVITY_MS) {
         await (useAuthStore.getState().signOut)();
