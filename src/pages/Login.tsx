@@ -65,7 +65,7 @@ export function Login() {
     <div className="min-h-[calc(100vh-3rem)] grid place-items-center px-3">
       <Card className="w-full max-w-sm">
         <div className="text-center mb-4">
-          <img src="/favicon.svg" alt="CheckMaster" className="mx-auto h-12 w-12" />
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="CheckMaster" className="mx-auto h-12 w-12" />
           <h1 className="text-lg font-semibold">CheckMaster</h1>
           {!isConfigured && (
             <p className="text-xs text-amber-600 mt-2">Configurar .env com credenciais do Firebase para autenticar.</p>

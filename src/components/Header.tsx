@@ -38,7 +38,8 @@ export function Header() {
           )}
           {/* Remover nomes dos menus; deixar apenas a logo para voltar ao menu */}
           <Link to="/home" aria-label="Voltar ao menu" className="inline-flex items-center">
-            <img src="/favicon.svg" alt="CheckMaster" className="h-6 w-6" />
+            {/* Usa BASE_URL para suportar deploy em subpath (GitHub Pages) */}
+            <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="CheckMaster" className="h-6 w-6" />
           </Link>
         </div>
         {/* Tema único escuro: remover botão de alternância */}

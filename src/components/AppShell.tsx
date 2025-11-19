@@ -27,7 +27,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div>
       {/* Restaurar camada visual anterior com fundo da classe cm-app */}
-      <div className="cm-app min-h-screen flex flex-col">
+      <div
+        className="cm-app min-h-screen flex flex-col"
+        style={{
+          backgroundImage: `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)), url(${import.meta.env.BASE_URL}bg-dark.jpg)`
+        }}
+      >
         <Header />
         <div className={`flex-1 pb-16 md:pb-0`}> {/* espaço para bottom nav em mobile */}
           {/* Remover container no wrapper para encostar a Sidebar na borda esquerda */}
