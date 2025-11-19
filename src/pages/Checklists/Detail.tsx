@@ -6,6 +6,7 @@ import { useUIStore } from '../../stores/ui';
 import { useAuthStore } from '../../stores/auth';
 import { finalizeChecklist, getChecklist, saveChecklist, setInProgress } from '../../services/checklists';
 import { supabase } from '../../config/supabase';
+import { safeUuid } from '../../utils/id';
 
 function secsToHMS(secs: number) {
   const h = Math.floor(secs / 3600);
@@ -132,7 +133,7 @@ export function ChecklistDetail() {
         const allowed = ['image/jpeg', 'image/png'];
         if (!allowed.includes(f.type)) { throw new Error('Apenas imagens JPEG/PNG são permitidas.'); }
         const ext = f.name.split('.').pop() || 'jpg';
-        const name = `${id}/${crypto.randomUUID()}.${ext}`;
+        const name = `${id}/${safeUuid()}.${ext}`;
         const { error } = await supabase.storage.from('checklists').upload(name, f);
         if (error) throw error;
         const { data } = await supabase.storage.from('checklists').createSignedUrl(name, 3600);
@@ -143,7 +144,10 @@ export function ChecklistDetail() {
       pushToast({ title: 'Salvo', message: 'Alterações salvas com sucesso.', variant: 'success' });
       await load();
     } catch (e: any) {
-      pushToast({ title: 'Erro ao salvar', message: e.message, variant: 'danger' });
+      const msg: string = (e?.message || '').toString();
+      const needsPolicyHint = /row-level|permission|policy|denied|Not\s+authorized/i.test(msg);
+      const hint = needsPolicyHint ? ' • Dica: verifique as policies do bucket "checklists" (INSERT/SELECT para authenticated).' : '';
+      pushToast({ title: 'Erro ao salvar', message: msg + hint, variant: 'danger' });
     } finally { setSaving(false); }
   };
 

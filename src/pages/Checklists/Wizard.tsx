@@ -17,6 +17,7 @@ import { Store, PlusCircle, X } from 'lucide-react';
 import { isValidUUID } from '../../utils/validators';
 // Use native crypto.randomUUID for unique filenames
 import { useUIStore } from '../../stores/ui';
+import { safeUuid } from '../../utils/id';
 
 const schema = z.object({
   plateId: z.string().min(1),
@@ -199,7 +200,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         if (!allowed.includes((f as File).type)) throw new Error('Apenas imagens JPEG/PNG são permitidas.');
         const toUpload: File = f as File;
         const ext = (toUpload.name.split('.').pop() || 'jpg');
-        const name = `${id}/${crypto.randomUUID()}.${ext}`;
+        const name = `${id}/${safeUuid()}.${ext}`;
         const { error } = await supabase.storage.from('checklists').upload(name, toUpload);
         if (error) throw error;
         const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(name, 3600);
@@ -216,7 +217,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         if (!allowedBudget.includes(mime)) throw new Error('Anexos permitidos: PDF/JPEG/PNG.');
         const name = (f as File)?.name || 'anexo';
         const ext = name.includes('.') ? name.split('.').pop() : 'bin';
-        const path = `${id}/budget-${crypto.randomUUID()}.${ext}`;
+        const path = `${id}/budget-${safeUuid()}.${ext}`;
         const { error } = await supabase.storage.from('checklists').upload(path, f as File);
         if (error) throw error;
         budgetAttachments.push({ type: 'budget', path, name, createdAt: Date.now() });
@@ -227,7 +228,8 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       if ((data as any).fuelGaugeEntry) {
         const entryF = (data as any).fuelGaugeEntry as File;
         if (!['image/jpeg','image/png'].includes(entryF.type)) throw new Error('Foto de combustível inválida.');
-        const path = `${id}/fuel-entry-${crypto.randomUUID()}.jpg`;
+        const entryExt = entryF.type === 'image/png' ? 'png' : 'jpg';
+        const path = `${id}/fuel-entry-${safeUuid()}.${entryExt}`;
         const { error } = await supabase.storage.from('checklists').upload(path, entryF);
         if (error) throw error;
         fuelGaugePhotos.entry = path;
@@ -235,7 +237,8 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       if ((data as any).fuelGaugeExit) {
         const exitF = (data as any).fuelGaugeExit as File;
         if (!['image/jpeg','image/png'].includes(exitF.type)) throw new Error('Foto de combustível inválida.');
-        const path = `${id}/fuel-exit-${crypto.randomUUID()}.jpg`;
+        const exitExt = exitF.type === 'image/png' ? 'png' : 'jpg';
+        const path = `${id}/fuel-exit-${safeUuid()}.${exitExt}`;
         const { error } = await supabase.storage.from('checklists').upload(path, exitF);
         if (error) throw error;
         fuelGaugePhotos.exit = path;
@@ -250,7 +253,12 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       pushToast({ title: 'Ação necessária', message: 'Finalize o checklist na página de detalhes quando concluir.', variant: 'warning' });
       // navegar para a página de detalhes
       nav(`/checklists/${id}`);
-    } catch (e: any) { pushToast({ title: 'Erro ao salvar', message: e.message, variant: 'danger' }); }
+    } catch (e: any) {
+      const msg: string = (e?.message || '').toString();
+      const needsPolicyHint = /row-level|permission|policy|denied|Not\s+authorized/i.test(msg);
+      const hint = needsPolicyHint ? ' • Dica: verifique as policies do bucket "checklists" (INSERT/SELECT para authenticated).' : '';
+      pushToast({ title: 'Erro ao salvar', message: msg + hint, variant: 'danger' });
+    }
     finally { setSubmitting(false); }
   });
 
