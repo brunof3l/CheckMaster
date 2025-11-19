@@ -22,7 +22,9 @@ export default defineConfig({
       manifest: {
         name: 'CheckMaster',
         short_name: 'CheckMaster',
-        start_url: '/',
+        // Garantir que PWA e navegação usem o subpath correto (GitHub Pages)
+        start_url: process.env.VITE_BASE_PATH || '/CheckMaster/',
+        scope: process.env.VITE_BASE_PATH || '/CheckMaster/',
         display: 'standalone',
         background_color: '#0B1324',
         theme_color: '#0B1324',
@@ -42,6 +44,8 @@ export default defineConfig({
         ]
       },
       workbox: {
+        // Fallback de navegação para SPA dentro do escopo
+        navigateFallback: 'index.html',
         runtimeCaching: [
           {
             urlPattern: /.*\.(?:png|jpg|jpeg|svg|gif)/,
