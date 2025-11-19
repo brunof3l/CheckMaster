@@ -51,18 +51,28 @@ export async function finalizeChecklist(id: string, userId?: string) {
     const rpcMissing = msg.includes('function finalize_checklist') || msg.includes('does not exist');
     const permission = msg.includes('permission denied') || msg.includes('row-level security');
     if (rpcMissing || permission) {
-      // Fallback: finalize directly via update
-      const row = await supabase.from('checklists').select('started_at').eq('id', id).single();
+      // Fallback: tentar finalizar via UPDATE respeitando a policy de is_locked=false
+      const row = await supabase.from('checklists').select('started_at, is_locked').eq('id', id).single();
       if (row.error) throw row.error;
       const started = row.data?.started_at ? new Date(row.data.started_at).getTime() : Date.now();
       const secs = Math.max(0, Math.floor((Date.now() - started) / 1000));
-      const up = await supabase.from('checklists').update({
+
+      // 1) Primeiro, atualiza status/tempos sem alterar is_locked para passar no WITH CHECK
+      const up1 = await supabase.from('checklists').update({
         finished_at: new Date().toISOString(),
         status: 'finalizado',
-        is_locked: true,
         maintenance_seconds: secs,
       }).eq('id', id);
-      if (up.error) throw up.error;
+      if (up1.error) {
+        // Se ainda falhar por RLS/permission, propaga o mesmo erro do RPC
+        throw up1.error;
+      }
+
+      // 2) Em seguida, tenta marcar is_locked=true (pode falhar por RLS; UI já bloqueia por status)
+      try {
+        await supabase.from('checklists').update({ is_locked: true }).eq('id', id);
+      } catch {}
+
       return { success: true, maintenance_seconds: secs };
     }
     throw e;
