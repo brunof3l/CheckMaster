@@ -354,6 +354,17 @@ do $$ begin
   exception when duplicate_object then null; end;
 end $$;
 
+-- Garantir bucket de Storage 'checklists'
+-- Em ambientes onde o reset não é executado, o bucket pode não existir e
+-- uploads falharão com "bucket not found". Este bloco cria o bucket se faltar.
+do $$ begin
+  begin
+    insert into storage.buckets (id, name, public)
+    values ('checklists', 'checklists', false)
+    on conflict (id) do nothing;
+  exception when undefined_table then null; end;
+end $$;
+
 -- Storage policies (bucket 'checklists')
 -- Observação: em projetos hospedados no Supabase, a tabela storage.objects
 -- é geralmente de propriedade de um papel interno (ex.: supabase_admin).

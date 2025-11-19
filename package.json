@@ -10,6 +10,7 @@
     "test": "vitest",
     "reset:auth": "node scripts/reset-auth.mjs",
     "reset:storage": "node scripts/reset-storage.mjs",
+    "reset:storage:hard": "node scripts/reset-storage-hard.mjs",
     "user:purge": "node scripts/manage-user.mjs purge --email",
     "user:reactivate": "node scripts/manage-user.mjs reactivate --email",
     "user:deactivate": "node scripts/manage-user.mjs deactivate --email",
