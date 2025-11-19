@@ -21,7 +21,17 @@ export async function insertChecklist(d: any) {
   // Registra o criador quando disponível para suportar RLS por ownership
   const { data: authInfo } = await supabase.auth.getUser();
   const createdBy = authInfo?.user?.id || null;
-  const { data, error } = await supabase.from('checklists').insert([{ ...d, plate, created_by: createdBy }]).select().single();
+  // Gera seq no momento da criação para evitar UPDATE posterior
+  let seq: string | null = null;
+  try {
+    const { data: s } = await supabase.rpc('get_next_checklist_seq');
+    seq = (s as any) || null;
+  } catch {
+    // Fallback: seq temporária baseada em timestamp (não totalmente sequencial)
+    const p = String(Math.floor(Date.now() / 1000)).slice(-6).padStart(6, '0');
+    seq = `CHECK-${p}`;
+  }
+  const { data, error } = await supabase.from('checklists').insert([{ ...d, seq, plate, created_by: createdBy }]).select().single();
   if (error) throw error;
   if (!data) throw new Error('Falha ao criar checklist');
   return data;

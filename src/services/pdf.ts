@@ -140,8 +140,14 @@ export async function generateChecklistPdf(id: string) {
     for (let i = 0; i < media.length; i++) {
       ensureSpace(largeH + 24);
       const m = media[i];
-      const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(m.path, 3600);
-      const durl = signed?.signedUrl ? await toDataUrl(signed.signedUrl) : null;
+      let signedUrl: string | undefined;
+      try {
+        const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(m.path, 3600);
+        signedUrl = signed?.signedUrl;
+      } catch {}
+      // Fallback: usar URL previamente salva se não conseguir assinar
+      const candidate = signedUrl || (m?.url as string | undefined);
+      const durl = candidate ? await toDataUrl(candidate) : null;
       const fmt = inferImageFormat(m.path || '');
       if (durl) {
         try { doc.addImage(durl, fmt, margin, y, largeW, largeH); } catch {

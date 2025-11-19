@@ -100,7 +100,7 @@ returns text as $$
 declare n bigint;
 begin
   n:=nextval('checklist_seq');
-  return 'CHK-'||lpad(n::text,6,'0');
+  return 'CHECK-'||lpad(n::text,6,'0');
 end;
 $$ language plpgsql;
 ```

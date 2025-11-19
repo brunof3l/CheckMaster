@@ -69,16 +69,27 @@ export function ChecklistDetail() {
         const newMediaUrls: Record<string, string> = {};
         for (const m of (data?.media || [])) {
           if (m?.path) {
-            const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(m.path, 3600);
-            if (signed?.signedUrl) newMediaUrls[m.path] = signed.signedUrl;
+            let url: string | undefined;
+            try {
+              const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(m.path, 3600);
+              url = signed?.signedUrl;
+            } catch {}
+            // Fallback: usar URL previamente salva se não conseguir assinar
+            if (!url && m?.url) url = m.url;
+            if (url) newMediaUrls[m.path] = url;
           }
         }
         setMediaUrls(newMediaUrls);
         const newBudgetUrls: Record<string, string> = {};
         for (const b of (data?.budgetAttachments || [])) {
           if (b?.path) {
-            const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(b.path, 3600);
-            if (signed?.signedUrl) newBudgetUrls[b.path] = signed.signedUrl;
+            let url: string | undefined;
+            try {
+              const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(b.path, 3600);
+              url = signed?.signedUrl;
+            } catch {}
+            if (!url && b?.url) url = b.url;
+            if (url) newBudgetUrls[b.path] = url;
           }
         }
         setBudgetUrls(newBudgetUrls);

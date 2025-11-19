@@ -79,9 +79,17 @@ returns text as $$
 declare n bigint;
 begin
   n := nextval('public.checklist_seq');
-  return 'CHK-' || lpad(n::text, 6, '0');
+  -- Formato solicitado: CHECK-000001
+  return 'CHECK-' || lpad(n::text, 6, '0');
 end;
 $$ language plpgsql;
+
+-- Backfill: atribuir seq para registros existentes sem código
+do $$ begin
+  update public.checklists
+  set seq = public.get_next_checklist_seq()
+  where coalesce(seq, '') = '';
+exception when others then null; end $$;
 
 -- RPC for CNPJ (mock/cache)
 create or replace function public.getCnpjData(p_cnpj text)

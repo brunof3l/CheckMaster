@@ -247,11 +247,6 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         fuelGaugePhotos.exit = path;
       }
       if (Object.keys(fuelGaugePhotos).length) await updateChecklist(id, { fuelGaugePhotos });
-      // sequência via RPC
-      try {
-        const seq = await getNextChecklistSeq();
-        await updateChecklist(id, { seq });
-      } catch { /* silencioso */ }
       // mover para em andamento para iniciar contagem do tempo
       try {
         await setInProgress(id);
