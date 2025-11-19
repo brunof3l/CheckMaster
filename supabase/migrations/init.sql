@@ -284,7 +284,7 @@ do $$ begin
     create policy checklists_delete_admin on public.checklists
     for delete to authenticated using (
       exists (
-        select 1 from public.users u where u.id = auth.uid() and lower(coalesce(u.role, '')) = 'admin'
+        select 1 from public.users u where u.id = auth.uid() and lower(btrim(coalesce(u.role, ''))) = 'admin'
       )
     );
   exception when duplicate_object then null; end;
@@ -294,6 +294,27 @@ do $$ begin
     for delete to authenticated using (created_by = auth.uid() and is_locked = false);
   exception when duplicate_object then null; end;
 end $$;
+
+-- RPC: exclusão com privilégio (security definer) para admins
+-- Remove versão prévia se existir com assinatura diferente
+drop function if exists public.admin_delete_checklist(uuid);
+create or replace function public.admin_delete_checklist(chk_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Apenas admin pode executar
+  if not exists (
+    select 1 from public.users u where u.id = auth.uid() and lower(btrim(coalesce(u.role, ''))) = 'admin'
+  ) then
+    raise exception 'permission denied';
+  end if;
+  -- Delete direto; RLS ignorado por security definer
+  delete from public.checklists where id = chk_id;
+end;
+$$;
 
 -- Suppliers policies
 do $$ begin

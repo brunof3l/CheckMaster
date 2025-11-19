@@ -44,7 +44,16 @@ export async function updateChecklist(id: string, patch: any) {
 export async function deleteChecklist(id: string) {
   // Remove diretamente o checklist; entradas em checklist_audit
   // serão removidas por ON DELETE CASCADE no banco.
-  return supabase.from('checklists').delete().eq('id', id);
+  const res = await supabase.from('checklists').delete().eq('id', id);
+  const msg = res.error?.message || '';
+  // Fallback: se RLS negar (permission denied), tentar via RPC admin_delete_checklist
+  if (res.error && /permission\s+denied/i.test(msg)) {
+    const rpc = await supabase.rpc('admin_delete_checklist', { chk_id: id });
+    if (rpc.error) return rpc;
+    // Normaliza resposta semelhante ao delete()
+    return { data: null, error: null } as any;
+  }
+  return res as any;
 }
 
 // Suppliers
