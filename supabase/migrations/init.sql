@@ -276,9 +276,22 @@ do $$ begin
     create policy checklists_update_unlocked on public.checklists
     for update to authenticated using (is_locked = false) with check (is_locked = false);
   exception when duplicate_object then null; end;
+  -- Recria a policy de delete para admin com checagem case-insensitive
+  begin
+    drop policy if exists checklists_delete_admin on public.checklists;
+  exception when undefined_object then null; end;
   begin
     create policy checklists_delete_admin on public.checklists
-    for delete to authenticated using (exists (select 1 from public.users u where u.id = auth.uid() and u.role = 'admin'));
+    for delete to authenticated using (
+      exists (
+        select 1 from public.users u where u.id = auth.uid() and lower(coalesce(u.role, '')) = 'admin'
+      )
+    );
+  exception when duplicate_object then null; end;
+  -- Permitir que o proprietário exclua quando desbloqueado
+  begin
+    create policy checklists_delete_owner_unlocked on public.checklists
+    for delete to authenticated using (created_by = auth.uid() and is_locked = false);
   exception when duplicate_object then null; end;
 end $$;
 
