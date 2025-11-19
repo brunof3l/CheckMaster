@@ -140,7 +140,9 @@ do $$ begin
   -- Grants para usuários autenticados
   grant usage on schema public to authenticated;
   grant select, update, delete on table public.users to authenticated;
-  grant select on table public.checklists, public.suppliers, public.vehicles to authenticated;
+  -- Conceder privilégios completos necessários conforme políticas RLS
+  grant select, insert, update, delete on table public.suppliers to authenticated;
+  grant select on table public.checklists, public.vehicles to authenticated;
 
   -- Grants para service_role (bypass RLS, mas ainda requer privilégios)
   grant usage on schema public to service_role;
@@ -242,9 +244,11 @@ do $$ begin
   exception when duplicate_object then null; end;
 
   begin
-    create policy suppliers_delete_admin on public.suppliers
+    -- Permitir exclusão para admin e editor
+    drop policy if exists suppliers_delete_admin on public.suppliers;
+    create policy suppliers_delete_roles on public.suppliers
     for delete to authenticated using (
-      exists (select 1 from public.users u where u.id = auth.uid() and u.role = 'admin')
+      exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','editor'))
     );
   exception when duplicate_object then null; end;
 
