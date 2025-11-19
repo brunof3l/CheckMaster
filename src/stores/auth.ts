@@ -123,13 +123,39 @@ export const useAuthStore = create<AuthState>((set) => ({
       const usr = data?.user;
       // Verifica se existe perfil e se está ativo; não recria automaticamente
       if (usr?.id) {
-        const { data: prof, error: profErr } = await supabase
+        let { data: prof, error: profErr } = await supabase
           .from('users')
-          .select('role, is_active')
+          .select('role, is_active, display_name, email')
           .eq('id', usr.id)
           .single();
-        // Se não existir perfil ou estiver inativo, bloqueia acesso
-        if (profErr || !prof || (prof as any)?.is_active === false) {
+        // Se o perfil não existir, cria um perfil mínimo automaticamente
+        if (profErr || !prof) {
+          try {
+            const profile = {
+              id: usr.id,
+              email: usr.email,
+              display_name: (usr.email || '')?.split('@')[0],
+              role: 'editor',
+              is_active: true,
+            } as any;
+            const up = await supabase.from('users').upsert(profile, { onConflict: 'id' });
+            const msg = up.error?.message || '';
+            // Fallback: se colunas opcionais não existirem, tenta payload mínimo
+            if (up.error && /column/i.test(msg)) {
+              await supabase.from('users').upsert({ id: usr.id, email: usr.email, display_name: (usr.email || '')?.split('@')[0] }, { onConflict: 'id' });
+            }
+            // Recarrega perfil após criar
+            const refetch = await supabase
+              .from('users')
+              .select('role, is_active')
+              .eq('id', usr.id)
+              .single();
+            prof = refetch.data as any;
+            profErr = refetch.error as any;
+          } catch {}
+        }
+        // Se estiver inativo, bloquear acesso
+        if ((prof as any)?.is_active === false) {
           await sbSignOut();
           set({ user: null, role: null, loading: false });
           useUIStore.getState().pushToast({
@@ -199,7 +225,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     try { unbindActivityListeners(); } catch {}
   },
   resetPassword: async (email) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    // Incluir BASE_URL para apps servidos em subpath (ex.: /CheckMaster/)
+    const redirectBase = window.location.origin + (import.meta.env.BASE_URL || '/');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: redirectBase });
     if (error) { useUIStore.getState().pushToast({ title: 'Erro ao enviar', message: error.message, variant: 'danger' }); return; }
     useUIStore.getState().pushToast({ title: 'Recuperação enviada', message: 'Verifique seu e-mail.', variant: 'info' });
   },
