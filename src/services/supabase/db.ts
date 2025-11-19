@@ -38,7 +38,10 @@ export async function insertChecklist(d: any) {
 }
 
 export async function updateChecklist(id: string, patch: any) {
-  return supabase.from('checklists').update(patch).eq('id', id);
+  // Ensure callers get an error when update fails; previously it was silent
+  const { data, error } = await supabase.from('checklists').update(patch).eq('id', id);
+  if (error) throw error;
+  return data;
 }
 
 export async function deleteChecklist(id: string) {
