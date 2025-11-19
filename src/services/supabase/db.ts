@@ -42,13 +42,8 @@ export async function updateChecklist(id: string, patch: any) {
 }
 
 export async function deleteChecklist(id: string) {
-  // Primeiro remove registros dependentes na tabela de auditoria
-  const auditRes = await supabase.from('checklist_audit').delete().eq('checklist_id', id);
-  // Se a tabela não existir, ignore; caso contrário, propague o erro
-  if (auditRes.error && !/relation "checklist_audit" does not exist/i.test(auditRes.error.message)) {
-    return auditRes;
-  }
-  // Agora remove o checklist
+  // Remove diretamente o checklist; entradas em checklist_audit
+  // serão removidas por ON DELETE CASCADE no banco.
   return supabase.from('checklists').delete().eq('id', id);
 }
 

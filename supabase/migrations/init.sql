@@ -357,12 +357,25 @@ end $$;
 -- Audit table
 create table if not exists public.checklist_audit (
   id uuid primary key default gen_random_uuid(),
-  checklist_id uuid references public.checklists(id),
+  checklist_id uuid references public.checklists(id) on delete cascade,
   user_id uuid,
   action text,
   details jsonb,
   created_at timestamptz default now()
 );
+
+-- Garantir ON DELETE CASCADE no FK, caso a tabela já exista com restrição antiga
+do $$ begin
+  begin
+    alter table if exists public.checklist_audit
+      drop constraint if exists checklist_audit_checklist_id_fkey;
+  exception when undefined_object then null; end;
+  begin
+    alter table if exists public.checklist_audit
+      add constraint checklist_audit_checklist_id_fkey
+      foreign key (checklist_id) references public.checklists(id) on delete cascade;
+  exception when duplicate_object then null; end;
+end $$;
 
 -- Optional RLS policies (pseudo; adjust in SQL Editor as needed)
 -- Example: allow edit when created_by = auth.uid() and status != 'finalizado'
