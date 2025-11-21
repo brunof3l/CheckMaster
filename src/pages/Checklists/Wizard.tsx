@@ -216,6 +216,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       const mediaItems: any[] = [];
       // Usar o estado observado para evitar perda por validação do Zod
       let mediaFiles = mediaSelectedRef.current.length ? mediaSelectedRef.current : ((watch('media') || []) as File[]);
+      console.log('[DEBUG CM] onFinish selected media files =', mediaFiles?.map(f => (f as any)?.name || 'file'));
       for (const f of mediaFiles) {
         const allowed = ['image/jpeg', 'image/png', 'image/webp'];
         if (!allowed.includes((f as File).type)) throw new Error('Apenas imagens JPEG/PNG/WebP são permitidas.');
@@ -229,12 +230,14 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         idx++;
         setUploadProgress(Math.round((idx / (mediaFiles.length || 1)) * 100));
       }
+      console.log('[DEBUG CM] onFinish mediaItems =', mediaItems);
 
       const budgetAttachments: any[] = [];
       let budgetFilesSel = ((data as any).budgetFiles || []) as File[];
       if (!budgetFilesSel.length && budgetSelectedRef.current.length) {
         budgetFilesSel = budgetSelectedRef.current;
       }
+      console.log('[DEBUG CM] onFinish selected budget files =', budgetFilesSel?.map(f => (f as any)?.name || 'file'));
       for (const f of budgetFilesSel) {
         const mime = (f as File).type || '';
         const allowedBudget = ['application/pdf','image/jpeg','image/png','image/webp'];
@@ -246,6 +249,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         if (error) throw error;
         budgetAttachments.push({ type: 'budget', path, name, created_at: new Date().toISOString() });
       }
+      console.log('[DEBUG CM] onFinish budgetAttachments =', budgetAttachments);
 
       const fuelGaugePhotos: any = {};
       const entryCandidate = (data as any).fuelGaugeEntry || fuelEntrySelectedRef.current;
@@ -268,13 +272,16 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         if (error) throw error;
         fuelGaugePhotos.exit = path;
       }
+      console.log('[DEBUG CM] onFinish fuelGaugePhotos =', fuelGaugePhotos);
 
-      // Atualização única de todos os campos anexos
-      await updateChecklist(id, {
-        media: mediaItems,
-        budgetAttachments,
-        fuelGaugePhotos
-      });
+      // Atualização com campos condicionais para evitar zerar arrays existentes
+      const patch: any = {};
+      if (Array.isArray(mediaItems) && mediaItems.length > 0) patch.media = mediaItems;
+      if (Array.isArray(budgetAttachments) && budgetAttachments.length > 0) patch.budgetAttachments = budgetAttachments;
+      if (fuelGaugePhotos && (fuelGaugePhotos.entry || fuelGaugePhotos.exit)) patch.fuelGaugePhotos = fuelGaugePhotos;
+      console.log('[DEBUG CM] updateChecklist payload =', patch);
+      // Atualização única dos campos presentes
+      await updateChecklist(id, patch);
       // Feedback de depuração: quantidades salvas
       try {
         const fuelCount = (fuelGaugePhotos?.entry ? 1 : 0) + (fuelGaugePhotos?.exit ? 1 : 0);

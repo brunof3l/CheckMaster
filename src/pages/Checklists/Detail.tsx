@@ -4,7 +4,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useUIStore } from '../../stores/ui';
 import { useAuthStore } from '../../stores/auth';
-import { finalizeChecklist, getChecklist, saveChecklist, setInProgress } from '../../services/checklists';
+import { finalizeChecklist, getChecklist, saveChecklist, setInProgress, debugLoadChecklistRaw } from '../../services/checklists';
 import { supabase } from '../../config/supabase';
 import { safeUuid } from '../../utils/id';
 
@@ -54,6 +54,9 @@ export function ChecklistDetail() {
     setLoading(true);
     try {
       const data = await getChecklist(id);
+      if ((import.meta as any)?.env?.DEV) {
+        try { await debugLoadChecklistRaw(id!); } catch {}
+      }
       // Normalizar colunas alternativas (lowercase/snake_case) para camelCase usado na UI
       const normalized: any = { ...data };
       const rawAttachments = (data as any)?.attachments;
@@ -69,6 +72,10 @@ export function ChecklistDetail() {
       if (!normalized.fuelGaugePhotos && ((data as any)?.fuelgaugephotos || (data as any)?.fuel_gauge_photos)) {
         normalized.fuelGaugePhotos = (data as any)?.fuelgaugephotos || (data as any)?.fuel_gauge_photos;
       }
+      try {
+        console.log('[DEBUG CM] detail checklist.media =', normalized?.media);
+        console.log('[DEBUG CM] detail checklist.budgetAttachments =', normalized?.budgetAttachments);
+      } catch {}
       setItem(normalized);
       try {
         const mediaArr = (normalized?.media || []) as any[];

@@ -33,11 +33,15 @@ export function ChecklistsList() {
       // Em breve, substituiremos por autocomplete que usa o supplier_id.
       const { data, error } = await query;
       if (error) throw error;
-      const normalized = (data || []).map((d: any) => ({
-        ...d,
-        supplierName: '-',
-        photoCount: Array.isArray((d as any)?.media) ? ((d as any).media.filter((m: any) => m?.type === 'photo').length) : 0,
-      }));
+      const normalized = (data || []).map((d: any) => {
+        const photoCount = Array.isArray((d as any)?.media) ? ((d as any).media.filter((m: any) => m?.type === 'photo').length) : 0;
+        try { console.log('[DEBUG CM] list row.media =', (d as any)?.media, 'photoCount=', photoCount, 'id=', d.id); } catch {}
+        return {
+          ...d,
+          supplierName: '-',
+          photoCount,
+        };
+      });
       setPage(pageIndex);
       setItems(reset ? normalized : [...items, ...normalized]);
     } catch (e: any) { pushToast({ title: 'Erro ao carregar', message: e.message, variant: 'danger' }); } finally { setLoading(false); }

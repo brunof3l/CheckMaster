@@ -40,6 +40,8 @@ export async function insertChecklist(d: any) {
 export async function updateChecklist(id: string, patch: any) {
   // Normalizar nomes de colunas (camelCase → variantes do banco)
   const normalized: any = { ...patch };
+  // Logs de depuração do payload original
+  try { console.log('[DEBUG CM] updateChecklist received patch =', patch); } catch {}
   // camelCase → lower (sem underscore)
   if ('budgetAttachments' in normalized && !('budgetattachments' in normalized)) {
     normalized.budgetattachments = normalized.budgetAttachments;
@@ -59,6 +61,26 @@ export async function updateChecklist(id: string, patch: any) {
     delete normalized.fuelGaugePhotos;
   }
   // Não mapear 'media' para 'attachments' aqui; tentaremos fallback apenas se falhar
+
+  // Evitar zerar arrays: remover chaves vazias do update
+  if (Array.isArray(normalized.media) && normalized.media.length === 0) {
+    delete normalized.media;
+  }
+  if (Array.isArray(normalized.budgetattachments) && normalized.budgetattachments.length === 0) {
+    delete normalized.budgetattachments;
+  }
+  if (Array.isArray(normalized.budget_attachments) && normalized.budget_attachments.length === 0) {
+    delete normalized.budget_attachments;
+  }
+  // fuelGaugePhotos pode ser objeto vazio; evitar enviar quando vazio
+  if (normalized.fuelgaugephotos && !normalized.fuelgaugephotos.entry && !normalized.fuelgaugephotos.exit) {
+    delete normalized.fuelgaugephotos;
+  }
+  if (normalized.fuel_gauge_photos && !normalized.fuel_gauge_photos.entry && !normalized.fuel_gauge_photos.exit) {
+    delete normalized.fuel_gauge_photos;
+  }
+
+  try { console.log('[DEBUG CM] updateChecklist normalized payload =', normalized); } catch {}
 
   // Ensure callers get an error when update fails; previously it was silent
   const { data, error } = await supabase.from('checklists').update(normalized).eq('id', id);
@@ -84,6 +106,7 @@ export async function updateChecklist(id: string, patch: any) {
       altPatch.attachments = altPatch.media;
     }
     // Não adicionar 'attachments' automaticamente; apenas camelCase→snake_case
+    try { console.log('[DEBUG CM] updateChecklist schema fallback altPatch =', altPatch); } catch {}
     const alt = await supabase.from('checklists').update(altPatch).eq('id', id);
     if (!alt.error) return alt.data as any;
 
@@ -98,6 +121,7 @@ export async function updateChecklist(id: string, patch: any) {
     for (const k of keysToTry) {
       if (k in normalizedSingles) {
         const payload: any = { [k]: normalizedSingles[k] };
+        try { console.log('[DEBUG CM] updateChecklist granular try key=', k, 'payload=', payload); } catch {}
         const one = await supabase.from('checklists').update(payload).eq('id', id);
         if (!one.error) lastOk = one.data;
       }

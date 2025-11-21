@@ -80,6 +80,20 @@ export async function finalizeChecklist(id: string, userId?: string) {
   }
 }
 
+// Dev-only: carregar row bruta do DB e logar para depuração
+export async function debugLoadChecklistRaw(id: string) {
+  if (!(import.meta as any)?.env?.DEV) return null;
+  try {
+    const { data, error } = await supabase.from('checklists').select('*').eq('id', id).single();
+    if (error) throw error;
+    console.log('[DEBUG CM] DB row =', data);
+    return data;
+  } catch (e) {
+    console.log('[DEBUG CM] DB row error =', (e as any)?.message || e);
+    return null;
+  }
+}
+
 export async function reopenChecklist(id: string, userId?: string) {
   const { data, error } = await supabase.rpc('reopen_checklist', { chk_id: id, user_id: userId || null });
   if (error) throw error;
