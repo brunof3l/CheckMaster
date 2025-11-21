@@ -27,6 +27,27 @@ async function toDataUrl(url: string): Promise<string | null> {
   }
 }
 
+async function renderPdfFirstPage(url: string): Promise<string | null> {
+  try {
+    const pdfjsLib = await import('pdfjs-dist/build/pdf');
+    // Worker via CDN para evitar issues de bundler
+    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const loadingTask = (pdfjsLib as any).getDocument({ url });
+    const pdf = await loadingTask.promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 1.2 });
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    return canvas.toDataURL('image/png');
+  } catch {
+    return null;
+  }
+}
+
 export async function generateChecklistPdf(id: string) {
   const { jsPDF } = await import('jspdf');
   const data = await getChecklist(id);
@@ -118,21 +139,37 @@ export async function generateChecklistPdf(id: string) {
     line('Nenhum item registrado.', 12);
   }
 
-  // Budget attachments listing
+  // Budget attachments listing (camelCase & snake_case fallback)
   sectionTitle('Orçamento / Documentos');
-  const budgets = (data as any).budgetAttachments || [];
+  const budgets = (data as any).budgetAttachments || (data as any).budgetattachments || (data as any).budget_attachments || [];
   if (budgets.length) {
-    budgets.forEach((b: any) => {
-      const txt = `• ${b?.name || b?.path}`;
-      doc.text(txt, margin, y);
+    for (const b of budgets) {
+      const name = b?.name || b?.path || 'anexo';
+      doc.text(`• ${name}`, margin, y);
       y += 14;
-    });
+      // Tentar pré-visualização: se imagem, embutir; se PDF, renderizar primeira página
+      let signedUrl: string | undefined;
+      try {
+        const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(b.path, 3600);
+        signedUrl = signed?.signedUrl;
+      } catch {}
+      const isPdf = /\.pdf$/i.test(b?.path || b?.name || '');
+      const preview = isPdf ? (signedUrl ? await renderPdfFirstPage(signedUrl) : null) : (signedUrl ? await toDataUrl(signedUrl) : null);
+      if (preview) {
+        ensureSpace(240);
+        try { doc.addImage(preview, 'PNG', margin, y, innerWidth, 220); } catch {
+          doc.rect(margin, y, innerWidth, 220);
+          doc.text('prévia do anexo', margin + innerWidth/2 - 40, y + 110);
+        }
+        y += 230;
+      }
+    }
   } else {
     line('Nenhum anexo de orçamento.', 12);
   }
 
-  // Photos at the end with large size
-  const media = (data.media || []) as any[];
+  // Photos at the end with large size (camelCase & legacy fallback)
+  const media = ((data as any).media || (data as any).attachments || []) as any[];
   sectionTitle('Fotos');
   if (media.length) {
     const largeW = innerWidth; // full content width
@@ -162,6 +199,31 @@ export async function generateChecklistPdf(id: string) {
     }
   } else {
     line('Nenhuma foto anexada.', 12);
+  }
+
+  // Fuel gauge photos
+  const fuel = (data as any).fuelGaugePhotos || (data as any).fuel_gauge_photos || (data as any).fuelgaugephotos || {};
+  sectionTitle('Marcador de combustível');
+  if (fuel?.entry || fuel?.exit) {
+    const toSigned = async (p?: string) => {
+      if (!p) return null;
+      try {
+        const { data: s } = await supabase.storage.from('checklists').createSignedUrl(p, 3600);
+        return s?.signedUrl || null;
+      } catch { return null; }
+    };
+    const entryUrl = await toSigned(fuel.entry);
+    const exitUrl = await toSigned(fuel.exit);
+    if (entryUrl) {
+      const durl = await toDataUrl(entryUrl);
+      if (durl) { ensureSpace(220); try { doc.addImage(durl, 'PNG', margin, y, innerWidth, 200); } catch {} y += 210; }
+    }
+    if (exitUrl) {
+      const durl = await toDataUrl(exitUrl);
+      if (durl) { ensureSpace(220); try { doc.addImage(durl, 'PNG', margin, y, innerWidth, 200); } catch {} y += 210; }
+    }
+  } else {
+    line('Sem fotos de combustível.', 12);
   }
 
   // Footer

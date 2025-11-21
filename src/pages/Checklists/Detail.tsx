@@ -54,12 +54,36 @@ export function ChecklistDetail() {
     setLoading(true);
     try {
       const data = await getChecklist(id);
-      setItem(data);
-      setNotes(data?.notes || '');
+      // Normalizar colunas alternativas (lowercase/snake_case) para camelCase usado na UI
+      const normalized: any = { ...data };
+      const rawAttachments = (data as any)?.attachments;
+      const hasAttachments = Array.isArray(rawAttachments) && rawAttachments.length > 0;
+      const hasMedia = Array.isArray((normalized as any)?.media) && ((normalized as any)?.media?.length > 0);
+      // Se a coluna media estiver vazia, usar attachments como fonte
+      if (!hasMedia && hasAttachments) {
+        normalized.media = rawAttachments;
+      }
+      if (!normalized.budgetAttachments && ((data as any)?.budgetattachments || (data as any)?.budget_attachments)) {
+        normalized.budgetAttachments = (data as any)?.budgetattachments || (data as any)?.budget_attachments;
+      }
+      if (!normalized.fuelGaugePhotos && ((data as any)?.fuelgaugephotos || (data as any)?.fuel_gauge_photos)) {
+        normalized.fuelGaugePhotos = (data as any)?.fuelgaugephotos || (data as any)?.fuel_gauge_photos;
+      }
+      setItem(normalized);
+      try {
+        const mediaArr = (normalized?.media || []) as any[];
+        const photosCount = mediaArr.length;
+        const budgetArr = ((normalized as any)?.budgetAttachments || []) as any[];
+        const budgetCount = budgetArr.length;
+        const fuelObj = (normalized as any)?.fuelGaugePhotos || {};
+        const fuelCount = ((fuelObj?.entry ? 1 : 0) + (fuelObj?.exit ? 1 : 0));
+        pushToast({ title: 'Checklist carregado', message: `Fotos: ${photosCount} • Orçamento: ${budgetCount} • Combustível: ${fuelCount}`, variant: 'info' });
+      } catch {}
+      setNotes(normalized?.notes || '');
       // supplier name (fetch separately to avoid broken joins)
       try {
-        if (data?.supplier_id) {
-          const { data: sup } = await supabase.from('suppliers').select('nome').eq('id', data.supplier_id).single();
+        if (normalized?.supplier_id) {
+          const { data: sup } = await supabase.from('suppliers').select('nome').eq('id', normalized.supplier_id).single();
           setSupplierName((sup as any)?.nome || '');
         } else {
           setSupplierName('');
@@ -68,7 +92,8 @@ export function ChecklistDetail() {
       // Refresh signed URLs for storage paths
       try {
         const newMediaUrls: Record<string, string> = {};
-        for (const m of (data?.media || [])) {
+        const mediaArr = (normalized?.media || []) as any[];
+        for (const m of mediaArr) {
           if (m?.path) {
             let url: string | undefined;
             try {
@@ -82,7 +107,8 @@ export function ChecklistDetail() {
         }
         setMediaUrls(newMediaUrls);
         const newBudgetUrls: Record<string, string> = {};
-        for (const b of (data?.budgetAttachments || [])) {
+        const budgetArr = ((normalized as any)?.budgetAttachments || []) as any[];
+        for (const b of budgetArr) {
           if (b?.path) {
             let url: string | undefined;
             try {
@@ -95,21 +121,30 @@ export function ChecklistDetail() {
         }
         setBudgetUrls(newBudgetUrls);
         const newFuelUrls: Record<string, string> = {};
-        if (data?.fuelGaugePhotos?.entry) {
-          const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(data.fuelGaugePhotos.entry, 3600);
+        const fuelObj = (normalized as any)?.fuelGaugePhotos || {};
+        if (fuelObj?.entry) {
+          const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(fuelObj.entry, 3600);
           if (signed?.signedUrl) newFuelUrls['entry'] = signed.signedUrl;
         }
-        if (data?.fuelGaugePhotos?.exit) {
-          const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(data.fuelGaugePhotos.exit, 3600);
+        if (fuelObj?.exit) {
+          const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(fuelObj.exit, 3600);
           if (signed?.signedUrl) newFuelUrls['exit'] = signed.signedUrl;
         }
         setFuelUrls(newFuelUrls);
       } catch {}
       // Move draft -> in progress on open
-      if (data?.status === 'rascunho') {
+      if (normalized?.status === 'rascunho') {
         await setInProgress(id);
         const updated = await getChecklist(id);
-        setItem(updated);
+        const normalizedUpdated: any = { ...updated };
+        if (!normalizedUpdated.media && (updated as any)?.attachments) normalizedUpdated.media = (updated as any)?.attachments;
+        if (!normalizedUpdated.budgetAttachments && ((updated as any)?.budgetattachments || (updated as any)?.budget_attachments)) {
+          normalizedUpdated.budgetAttachments = (updated as any)?.budgetattachments || (updated as any)?.budget_attachments;
+        }
+        if (!normalizedUpdated.fuelGaugePhotos && ((updated as any)?.fuelgaugephotos || (updated as any)?.fuel_gauge_photos)) {
+          normalizedUpdated.fuelGaugePhotos = (updated as any)?.fuelgaugephotos || (updated as any)?.fuel_gauge_photos;
+        }
+        setItem(normalizedUpdated);
       }
     } catch (e: any) {
       pushToast({ title: 'Erro', message: e.message, variant: 'danger' });
@@ -128,17 +163,20 @@ export function ChecklistDetail() {
         return;
       }
       await saveChecklist(id, { notes });
-      // upload selected media
-      for (const f of mediaSelection) {
-        const allowed = ['image/jpeg', 'image/png'];
-        if (!allowed.includes(f.type)) { throw new Error('Apenas imagens JPEG/PNG são permitidas.'); }
-        const ext = f.name.split('.').pop() || 'jpg';
-        const name = `${id}/${safeUuid()}.${ext}`;
-        const { error } = await supabase.storage.from('checklists').upload(name, f);
-        if (error) throw error;
-        const { data } = await supabase.storage.from('checklists').createSignedUrl(name, 3600);
-        const media = [ ...(item?.media || []), { type: 'photo', path: name, url: data?.signedUrl, createdAt: Date.now() } ];
-        await saveChecklist(id, { media });
+      // Upload de todas as fotos e atualização única da coluna `media`
+      if (mediaSelection.length) {
+        const nextMedia = [ ...(item?.media || []) ];
+        for (const f of mediaSelection) {
+      const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!allowed.includes(f.type)) { throw new Error('Apenas imagens JPEG/PNG/WebP são permitidas.'); }
+          const ext = f.name.split('.').pop() || 'jpg';
+          const name = `${id}/${safeUuid()}.${ext}`;
+          const { error } = await supabase.storage.from('checklists').upload(name, f);
+          if (error) throw error;
+          const { data } = await supabase.storage.from('checklists').createSignedUrl(name, 3600);
+          nextMedia.push({ type: 'photo', path: name, url: data?.signedUrl, createdAt: Date.now() });
+        }
+        await saveChecklist(id, { media: nextMedia });
       }
       setMediaSelection([]);
       pushToast({ title: 'Salvo', message: 'Alterações salvas com sucesso.', variant: 'success' });

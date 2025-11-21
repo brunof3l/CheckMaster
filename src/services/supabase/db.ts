@@ -38,20 +38,78 @@ export async function insertChecklist(d: any) {
 }
 
 export async function updateChecklist(id: string, patch: any) {
+  // Normalizar nomes de colunas (camelCase → variantes do banco)
+  const normalized: any = { ...patch };
+  // camelCase → lower (sem underscore)
+  if ('budgetAttachments' in normalized && !('budgetattachments' in normalized)) {
+    normalized.budgetattachments = normalized.budgetAttachments;
+    delete normalized.budgetAttachments;
+  }
+  if ('fuelGaugePhotos' in normalized && !('fuelgaugephotos' in normalized)) {
+    normalized.fuelgaugephotos = normalized.fuelGaugePhotos;
+    delete normalized.fuelGaugePhotos;
+  }
+  // camelCase → snake_case (para bases que usam underscore)
+  if ('budgetAttachments' in normalized && !('budget_attachments' in normalized)) {
+    normalized.budget_attachments = normalized.budgetAttachments;
+    delete normalized.budgetAttachments;
+  }
+  if ('fuelGaugePhotos' in normalized && !('fuel_gauge_photos' in normalized)) {
+    normalized.fuel_gauge_photos = normalized.fuelGaugePhotos;
+    delete normalized.fuelGaugePhotos;
+  }
+  // Não mapear 'media' para 'attachments' aqui; tentaremos fallback apenas se falhar
+
   // Ensure callers get an error when update fails; previously it was silent
-  const { data, error } = await supabase.from('checklists').update(patch).eq('id', id);
+  const { data, error } = await supabase.from('checklists').update(normalized).eq('id', id);
   if (!error) return data;
 
   const msg = (error.message || '').toString();
   // Supabase/PostgREST pode acusar erro de cache de schema quando colunas foram
   // adicionadas recentemente (ex.: budgetAttachments, fuelGaugePhotos).
   // Fallback: tentar novamente removendo chaves não reconhecidas.
-  const schemaCacheErr = /could not find the '?(budgetAttachments|fuelGaugePhotos)'? column of 'checklists' in the schema cache/i.test(msg)
-    || /column\s+"?(budgetAttachments|fuelGaugePhotos)"?\s+.*does\s+not\s+exist/i.test(msg);
+  const schemaCacheErr = /could not find the '?(budgetAttachments|fuelGaugePhotos|media|attachments)'? column of 'checklists' in the schema cache/i.test(msg)
+    || /column\s+"?(budgetAttachments|fuelGaugePhotos|media|attachments)"?\s+.*does\s+not\s+exist/i.test(msg);
   if (schemaCacheErr) {
+    // 1) Tentar fallback com nomes snake_case quando camelCase não existe
+    const altPatch: any = { ...patch };
+    if (altPatch.budgetAttachments && !('budget_attachments' in altPatch)) {
+      altPatch.budget_attachments = altPatch.budgetAttachments;
+    }
+    if (altPatch.fuelGaugePhotos && !('fuel_gauge_photos' in altPatch)) {
+      altPatch.fuel_gauge_photos = altPatch.fuelGaugePhotos;
+    }
+    // Fallback adicional: se o banco usa 'attachments' em vez de 'media'
+    if (altPatch.media && !('attachments' in altPatch)) {
+      altPatch.attachments = altPatch.media;
+    }
+    // Não adicionar 'attachments' automaticamente; apenas camelCase→snake_case
+    const alt = await supabase.from('checklists').update(altPatch).eq('id', id);
+    if (!alt.error) return alt.data as any;
+
+    // 2) Tentativa granular: salvar campos individualmente (evita perder `media`)
+    const normalizedSingles: any = { ...normalized };
+    const keysToTry = [
+      'media', 'attachments',
+      'budgetattachments', 'budget_attachments',
+      'fuelgaugephotos', 'fuel_gauge_photos'
+    ];
+    let lastOk: any = null;
+    for (const k of keysToTry) {
+      if (k in normalizedSingles) {
+        const payload: any = { [k]: normalizedSingles[k] };
+        const one = await supabase.from('checklists').update(payload).eq('id', id);
+        if (!one.error) lastOk = one.data;
+      }
+    }
+    if (lastOk) return lastOk as any;
+
+    // 3) Último recurso: remover colunas não reconhecidas e salvar o restante
     const safePatch = { ...patch } as any;
     delete safePatch.budgetAttachments;
     delete safePatch.fuelGaugePhotos;
+    delete safePatch.media;
+    delete safePatch.attachments;
     const retry = await supabase.from('checklists').update(safePatch).eq('id', id);
     if (retry.error) throw retry.error;
     return retry.data as any;

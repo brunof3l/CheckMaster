@@ -41,6 +41,7 @@ type FormData = z.infer<typeof schema>;
 export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
   const { register, control, handleSubmit, setValue, watch, setFocus } = useForm<FormData>({
     resolver: zodResolver(schema),
+    shouldUnregister: false,
     defaultValues: {
       defectItems: [],
       otherDefects: '',
@@ -69,6 +70,23 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
   const [supplierOpen, setSupplierOpen] = useState<boolean>(false);
   const [plateQuery, setPlateQuery] = useState<string>('');
   const [plateOpen, setPlateOpen] = useState<boolean>(false);
+  // Pré-visualizações de mídia (Fotos)
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
+  // Ref persistente para evitar perda do array de arquivos ao navegar entre passos
+  const mediaSelectedRef = useRef<File[]>([]);
+  const budgetSelectedRef = useRef<File[]>([]);
+  const fuelEntrySelectedRef = useRef<File | null>(null);
+  const fuelExitSelectedRef = useRef<File | null>(null);
+  const mediaFiles = watch('media');
+  useEffect(() => {
+    const files = (mediaFiles || []) as File[];
+    const urls = files.map(f => URL.createObjectURL(f));
+    setMediaPreviews(urls);
+    // Espelha em ref persistente para garantir disponibilidade ao finalizar
+    mediaSelectedRef.current = files;
+    return () => { urls.forEach(u => URL.revokeObjectURL(u)); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaFiles]);
 
   // Fechar autocomplete ao clicar fora do box ou pressionar ESC
   useEffect(() => {
@@ -193,11 +211,14 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         notes: combinedNotes,
       });
       const id = checklist.id as string;
+      // Uploads iniciais
       let idx = 0;
       const mediaItems: any[] = [];
-      for (const f of data.media || []) {
-        const allowed = ['image/jpeg', 'image/png'];
-        if (!allowed.includes((f as File).type)) throw new Error('Apenas imagens JPEG/PNG são permitidas.');
+      // Usar o estado observado para evitar perda por validação do Zod
+      let mediaFiles = mediaSelectedRef.current.length ? mediaSelectedRef.current : ((watch('media') || []) as File[]);
+      for (const f of mediaFiles) {
+        const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowed.includes((f as File).type)) throw new Error('Apenas imagens JPEG/PNG/WebP são permitidas.');
         const toUpload: File = f as File;
         const ext = (toUpload.name.split('.').pop() || 'jpg');
         const name = `${id}/${safeUuid()}.${ext}`;
@@ -206,15 +227,18 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(name, 3600);
         mediaItems.push({ type: 'photo', path: name, url: signed?.signedUrl, createdAt: Date.now() });
         idx++;
-        setUploadProgress(Math.round((idx / (data.media.length || 1)) * 100));
+        setUploadProgress(Math.round((idx / (mediaFiles.length || 1)) * 100));
       }
-      await updateChecklist(id, { media: mediaItems });
-      // anexos de orçamento (PDF/imagens)
+
       const budgetAttachments: any[] = [];
-      for (const f of (data as any).budgetFiles || []) {
+      let budgetFilesSel = ((data as any).budgetFiles || []) as File[];
+      if (!budgetFilesSel.length && budgetSelectedRef.current.length) {
+        budgetFilesSel = budgetSelectedRef.current;
+      }
+      for (const f of budgetFilesSel) {
         const mime = (f as File).type || '';
-        const allowedBudget = ['application/pdf','image/jpeg','image/png'];
-        if (!allowedBudget.includes(mime)) throw new Error('Anexos permitidos: PDF/JPEG/PNG.');
+        const allowedBudget = ['application/pdf','image/jpeg','image/png','image/webp'];
+        if (!allowedBudget.includes(mime)) throw new Error('Anexos permitidos: PDF/JPEG/PNG/WebP.');
         const name = (f as File)?.name || 'anexo';
         const ext = name.includes('.') ? name.split('.').pop() : 'bin';
         const path = `${id}/budget-${safeUuid()}.${ext}`;
@@ -222,28 +246,40 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         if (error) throw error;
         budgetAttachments.push({ type: 'budget', path, name, createdAt: Date.now() });
       }
-      if (budgetAttachments.length) await updateChecklist(id, { budgetAttachments });
-      // fotos do marcador de combustível (entrada/saída)
+
       const fuelGaugePhotos: any = {};
-      if ((data as any).fuelGaugeEntry) {
-        const entryF = (data as any).fuelGaugeEntry as File;
-        if (!['image/jpeg','image/png'].includes(entryF.type)) throw new Error('Foto de combustível inválida.');
-        const entryExt = entryF.type === 'image/png' ? 'png' : 'jpg';
+      const entryCandidate = (data as any).fuelGaugeEntry || fuelEntrySelectedRef.current;
+      if (entryCandidate) {
+        const entryF = entryCandidate as File;
+        if (!['image/jpeg','image/png','image/webp'].includes(entryF.type)) throw new Error('Foto de combustível inválida.');
+        const entryExt = entryF.type === 'image/png' ? 'png' : (entryF.type === 'image/webp' ? 'webp' : 'jpg');
         const path = `${id}/fuel-entry-${safeUuid()}.${entryExt}`;
         const { error } = await supabase.storage.from('checklists').upload(path, entryF);
         if (error) throw error;
         fuelGaugePhotos.entry = path;
       }
-      if ((data as any).fuelGaugeExit) {
-        const exitF = (data as any).fuelGaugeExit as File;
-        if (!['image/jpeg','image/png'].includes(exitF.type)) throw new Error('Foto de combustível inválida.');
-        const exitExt = exitF.type === 'image/png' ? 'png' : 'jpg';
+      const exitCandidate = (data as any).fuelGaugeExit || fuelExitSelectedRef.current;
+      if (exitCandidate) {
+        const exitF = exitCandidate as File;
+        if (!['image/jpeg','image/png','image/webp'].includes(exitF.type)) throw new Error('Foto de combustível inválida.');
+        const exitExt = exitF.type === 'image/png' ? 'png' : (exitF.type === 'image/webp' ? 'webp' : 'jpg');
         const path = `${id}/fuel-exit-${safeUuid()}.${exitExt}`;
         const { error } = await supabase.storage.from('checklists').upload(path, exitF);
         if (error) throw error;
         fuelGaugePhotos.exit = path;
       }
-      if (Object.keys(fuelGaugePhotos).length) await updateChecklist(id, { fuelGaugePhotos });
+
+      // Atualização única de todos os campos anexos
+      await updateChecklist(id, {
+        media: mediaItems,
+        budgetAttachments,
+        fuelGaugePhotos
+      });
+      // Feedback de depuração: quantidades salvas
+      try {
+        const fuelCount = (fuelGaugePhotos?.entry ? 1 : 0) + (fuelGaugePhotos?.exit ? 1 : 0);
+        pushToast({ title: 'Anexos salvos', message: `Fotos: ${mediaItems.length} • Orçamento: ${budgetAttachments.length} • Combustível: ${fuelCount}` , variant: 'success' });
+      } catch {}
       // mover para em andamento para iniciar contagem do tempo
       try {
         await setInProgress(id);
@@ -434,7 +470,9 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
             <input ref={mediaInputRef} type="file" className="hidden" accept="image/*" multiple onChange={(e) => {
               const files = Array.from(e.target.files || []);
               const current = (watch('media') || []) as File[];
-              field.onChange([ ...current, ...files ]);
+              const next = [ ...current, ...files ];
+              field.onChange(next);
+              mediaSelectedRef.current = next;
               (e.target as HTMLInputElement).value = '';
             }} />
           )} />
@@ -449,13 +487,21 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
           {watch('media')?.length ? (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {watch('media').map((f, i) => (
-                <div key={i} className="text-xs cm-card p-2 flex items-center justify-between gap-2">
-                  <span className="truncate">{(f as any).name}</span>
-                  <Button size="sm" variant="ghost" onClick={() => {
-                    const arr = (watch('media') || []) as File[];
-                    const next = arr.filter((_, idx) => idx !== i);
-                    setValue('media', next);
-                  }}>Remover</Button>
+                <div key={i} className="cm-card p-2 space-y-2">
+                  {mediaPreviews[i] ? (
+                    <img src={mediaPreviews[i]} alt={(f as any).name || 'Foto'} className="w-full h-32 object-cover rounded" />
+                  ) : (
+                    <div className="w-full h-32 bg-white/5 rounded flex items-center justify-center text-xs text-gray-400">Prévia indisponível</div>
+                  )}
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="truncate">{(f as any).name}</span>
+                    <Button size="sm" variant="ghost" onClick={() => {
+                      const arr = (watch('media') || []) as File[];
+                      const next = arr.filter((_, idx) => idx !== i);
+                      setValue('media', next);
+                      mediaSelectedRef.current = next;
+                    }}>Remover</Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -473,6 +519,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
             <input ref={budgetInputRef} type="file" className="hidden" accept=".pdf,image/*" multiple onChange={(e) => {
               const files = Array.from(e.target.files || []);
               field.onChange(files);
+              budgetSelectedRef.current = files;
             }} />
           )} />
           <div className="flex items-center gap-2">
@@ -494,6 +541,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
                 <input ref={fuelEntryRef} type="file" className="hidden" accept="image/*" onChange={(e) => {
                   const f = e.target.files?.[0];
                   field.onChange(f || undefined);
+                  fuelEntrySelectedRef.current = f || null;
                 }} />
               )} />
               <div className="flex items-center gap-2">
@@ -511,6 +559,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
                 <input ref={fuelExitRef} type="file" className="hidden" accept="image/*" onChange={(e) => {
                   const f = e.target.files?.[0];
                   field.onChange(f || undefined);
+                  fuelExitSelectedRef.current = f || null;
                 }} />
               )} />
               <div className="flex items-center gap-2">

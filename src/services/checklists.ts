@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase';
+import { updateChecklist as dbUpdateChecklist } from './supabase/db';
 import { sanitizeText } from '../utils/sanitize';
 
 export type Checklist = {
@@ -37,8 +38,8 @@ export async function saveChecklist(id: string, patch: Partial<Checklist>) {
   if (typeof sanitized.notes === 'string') {
     sanitized.notes = sanitizeText(sanitized.notes);
   }
-  const { error } = await supabase.from('checklists').update(sanitized).eq('id', id);
-  if (error) throw error;
+  // Delegar para o serviço centralizado com normalização e fallbacks (db.updateChecklist)
+  await dbUpdateChecklist(id, sanitized as any);
 }
 
 export async function finalizeChecklist(id: string, userId?: string) {
