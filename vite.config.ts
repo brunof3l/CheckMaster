@@ -2,10 +2,14 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Detecta ambiente de deploy e escolhe base adequada
+// - GitHub Pages (project page): '/CheckMaster/'
+// - Vercel/domínio próprio: '/'
+const BASE = process.env.VITE_BASE_PATH || (process.env.VERCEL ? '/' : '/CheckMaster/');
+
 export default defineConfig({
-  // Base para deploy em GitHub Pages (project page)
-  // Permite override via VITE_BASE_PATH quando usar domínio próprio
-  base: process.env.VITE_BASE_PATH || '/CheckMaster/',
+  // Base do app para assets e roteamento
+  base: BASE,
   server: {
     cors: {
       // Permite apenas origens do app durante desenvolvimento
@@ -22,9 +26,9 @@ export default defineConfig({
       manifest: {
         name: 'CheckMaster',
         short_name: 'CheckMaster',
-        // Garantir que PWA e navegação usem o subpath correto (GitHub Pages)
-        start_url: process.env.VITE_BASE_PATH || '/CheckMaster/',
-        scope: process.env.VITE_BASE_PATH || '/CheckMaster/',
+        // Garantir que PWA e navegação usem o subpath correto
+        start_url: BASE,
+        scope: BASE,
         display: 'standalone',
         background_color: '#0B1324',
         theme_color: '#0B1324',
