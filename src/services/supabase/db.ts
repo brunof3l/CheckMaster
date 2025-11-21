@@ -40,8 +40,24 @@ export async function insertChecklist(d: any) {
 export async function updateChecklist(id: string, patch: any) {
   // Ensure callers get an error when update fails; previously it was silent
   const { data, error } = await supabase.from('checklists').update(patch).eq('id', id);
-  if (error) throw error;
-  return data;
+  if (!error) return data;
+
+  const msg = (error.message || '').toString();
+  // Supabase/PostgREST pode acusar erro de cache de schema quando colunas foram
+  // adicionadas recentemente (ex.: budgetAttachments, fuelGaugePhotos).
+  // Fallback: tentar novamente removendo chaves não reconhecidas.
+  const schemaCacheErr = /could not find the '?(budgetAttachments|fuelGaugePhotos)'? column of 'checklists' in the schema cache/i.test(msg)
+    || /column\s+"?(budgetAttachments|fuelGaugePhotos)"?\s+.*does\s+not\s+exist/i.test(msg);
+  if (schemaCacheErr) {
+    const safePatch = { ...patch } as any;
+    delete safePatch.budgetAttachments;
+    delete safePatch.fuelGaugePhotos;
+    const retry = await supabase.from('checklists').update(safePatch).eq('id', id);
+    if (retry.error) throw retry.error;
+    return retry.data as any;
+  }
+
+  throw error;
 }
 
 export async function deleteChecklist(id: string) {
