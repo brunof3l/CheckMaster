@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { useUIStore } from '../../stores/ui';
 import { useAuthStore } from '../../stores/auth';
 import { finalizeChecklist, getChecklist, saveChecklist, setInProgress, debugLoadChecklistRaw } from '../../services/checklists';
+import { uploadPhoto } from '../../services/supabase/storage';
 import { supabase } from '../../config/supabase';
 import { safeUuid } from '../../utils/id';
 
@@ -174,19 +175,22 @@ export function ChecklistDetail() {
       if (mediaSelection.length) {
         const nextMedia = [ ...(item?.media || []) ];
         for (const f of mediaSelection) {
-      const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-      if (!allowed.includes(f.type)) { throw new Error('Apenas imagens JPEG/PNG/WebP são permitidas.'); }
-          const ext = f.name.split('.').pop() || 'jpg';
-          const name = `${id}/${safeUuid()}.${ext}`;
-          const { error } = await supabase.storage.from('checklists').upload(name, f);
-          if (error) throw error;
-          const { data } = await supabase.storage.from('checklists').createSignedUrl(name, 3600);
-          nextMedia.push({ type: 'photo', path: name, url: data?.signedUrl, created_at: new Date().toISOString() });
+          const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+          if (!allowed.includes(f.type)) { throw new Error('Apenas imagens JPEG/PNG/WebP são permitidas.'); }
+          const { path, url } = await uploadPhoto(id!, f);
+          nextMedia.push({ type: 'photo', path, url, created_at: new Date().toISOString() });
         }
         await saveChecklist(id, { media: nextMedia });
+        // Toast com contagem correta baseada em `media`
+        const photoCount = Array.isArray(nextMedia) ? nextMedia.filter(m => m?.type === 'photo').length : 0;
+        const budgetCount = Array.isArray(item?.budgetAttachments) ? item!.budgetAttachments.length : 0;
+        const fuelCount = (() => {
+          const fuel = (item as any)?.fuelGaugePhotos || {};
+          return (fuel?.entry ? 1 : 0) + (fuel?.exit ? 1 : 0);
+        })();
+        pushToast({ title: 'Anexos salvos', message: `Fotos: ${photoCount} • Orçamento: ${budgetCount} • Combustível: ${fuelCount}` , variant: 'success' });
       }
       setMediaSelection([]);
-      pushToast({ title: 'Salvo', message: 'Alterações salvas com sucesso.', variant: 'success' });
       await load();
     } catch (e: any) {
       const msg: string = (e?.message || '').toString();
