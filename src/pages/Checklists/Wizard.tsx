@@ -225,7 +225,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         const { error } = await supabase.storage.from('checklists').upload(name, toUpload);
         if (error) throw error;
         const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(name, 3600);
-        mediaItems.push({ type: 'photo', path: name, url: signed?.signedUrl, createdAt: Date.now() });
+        mediaItems.push({ type: 'photo', path: name, url: signed?.signedUrl, created_at: new Date().toISOString() });
         idx++;
         setUploadProgress(Math.round((idx / (mediaFiles.length || 1)) * 100));
       }
@@ -244,7 +244,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         const path = `${id}/budget-${safeUuid()}.${ext}`;
         const { error } = await supabase.storage.from('checklists').upload(path, f as File);
         if (error) throw error;
-        budgetAttachments.push({ type: 'budget', path, name, createdAt: Date.now() });
+        budgetAttachments.push({ type: 'budget', path, name, created_at: new Date().toISOString() });
       }
 
       const fuelGaugePhotos: any = {};

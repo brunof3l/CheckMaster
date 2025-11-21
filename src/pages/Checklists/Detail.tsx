@@ -174,7 +174,7 @@ export function ChecklistDetail() {
           const { error } = await supabase.storage.from('checklists').upload(name, f);
           if (error) throw error;
           const { data } = await supabase.storage.from('checklists').createSignedUrl(name, 3600);
-          nextMedia.push({ type: 'photo', path: name, url: data?.signedUrl, createdAt: Date.now() });
+          nextMedia.push({ type: 'photo', path: name, url: data?.signedUrl, created_at: new Date().toISOString() });
         }
         await saveChecklist(id, { media: nextMedia });
       }

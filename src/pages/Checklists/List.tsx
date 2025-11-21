@@ -24,7 +24,7 @@ export function ChecklistsList() {
       const pageIndex = reset ? 0 : page + 1;
       let query = supabase
         .from('checklists')
-        .select('id, seq, plate, status, created_at, supplier_id')
+        .select('id, seq, plate, status, created_at, supplier_id, media')
         .order('created_at', { ascending: false })
         .range(pageIndex * 10, pageIndex * 10 + 9);
       if (plate) query = query.eq('plate', plate);
@@ -33,7 +33,11 @@ export function ChecklistsList() {
       // Em breve, substituiremos por autocomplete que usa o supplier_id.
       const { data, error } = await query;
       if (error) throw error;
-      const normalized = (data || []).map((d: any) => ({ ...d, supplierName: '-' }));
+      const normalized = (data || []).map((d: any) => ({
+        ...d,
+        supplierName: '-',
+        photoCount: Array.isArray((d as any)?.media) ? ((d as any).media.filter((m: any) => m?.type === 'photo').length) : 0,
+      }));
       setPage(pageIndex);
       setItems(reset ? normalized : [...items, ...normalized]);
     } catch (e: any) { pushToast({ title: 'Erro ao carregar', message: e.message, variant: 'danger' }); } finally { setLoading(false); }
@@ -70,6 +74,7 @@ export function ChecklistsList() {
                   <th className="p-2">Placa</th>
                   <th className="p-2">Fornecedor</th>
                   <th className="p-2">Status</th>
+                  <th className="p-2">Fotos</th>
                 </tr>
               </thead>
               <tbody>
@@ -79,6 +84,7 @@ export function ChecklistsList() {
                     <td className="p-2">{it.plate || '-'}</td>
                     <td className="p-2">{it.supplierName || '-'}</td>
                     <td className="p-2">{it.status ? <Badge variant={it.status === 'finalizado' ? 'success' : it.status === 'em_andamento' ? 'warning' : 'info'}>{it.status}</Badge> : '-'}</td>
+                    <td className="p-2">{it.photoCount || 0}</td>
                   </tr>
                 ))}
               </tbody>
