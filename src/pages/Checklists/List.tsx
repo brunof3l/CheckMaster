@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { supabase } from '../../config/supabase';
 import { Search } from 'lucide-react';
@@ -8,6 +9,7 @@ import { Badge } from '../../components/ui/Badge';
 import { useUIStore } from '../../stores/ui';
 
 export function ChecklistsList() {
+  const navigate = useNavigate();
   const { register, watch } = useForm();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -24,7 +26,7 @@ export function ChecklistsList() {
       const pageIndex = reset ? 0 : page + 1;
       let query = supabase
         .from('checklists')
-        .select('id, seq, plate, status, created_at, supplier_id, media')
+        .select('id, seq, plate, status, created_at, started_at, finished_at, supplier_id, media')
         .order('created_at', { ascending: false })
         .range(pageIndex * 10, pageIndex * 10 + 9);
       if (plate) query = query.eq('plate', plate);
@@ -79,18 +81,31 @@ export function ChecklistsList() {
                   <th className="p-2">Fornecedor</th>
                   <th className="p-2">Status</th>
                   <th className="p-2">Fotos</th>
+                  <th className="p-2">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {items.slice(0, showAll ? items.length : 5).map(it => (
+                {items.slice(0, showAll ? items.length : 5).map(it => {
+                  const norm = (s: any) => String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+                  const isDraft = norm(it.status) === 'rascunho' || (!it.status && !it.started_at);
+                  return (
                   <tr key={it.id}>
                     <td className="p-2">{it.seq || '—'}</td>
                     <td className="p-2">{it.plate || '-'}</td>
                     <td className="p-2">{it.supplierName || '-'}</td>
                     <td className="p-2">{it.status ? <Badge variant={it.status === 'finalizado' ? 'success' : it.status === 'em_andamento' ? 'warning' : 'info'}>{it.status}</Badge> : '-'}</td>
                     <td className="p-2">{it.photoCount || 0}</td>
+                    <td className="p-2">
+                      {isDraft ? (
+                        <Button size="xs" onClick={() => navigate(`/checklists/${it.id}/edit`)}>
+                          Editar
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-gray-500">—</span>
+                      )}
+                    </td>
                   </tr>
-                ))}
+                );})}
               </tbody>
             </table>
           </div>
