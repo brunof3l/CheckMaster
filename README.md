@@ -61,6 +61,10 @@ Para domínio próprio, defina `VITE_BASE_PATH=/` e atualize as configurações 
 - Isso reinicia a sequência `public.checklist_seq` para que o próximo número seja `CHECK-000001`.
 - Se existirem checklists sem numeração, o script também preenche `seq` automaticamente.
 
+> Importante: se o número não aparecer ao abrir o Wizard, rode também `supabase/migrations/fix_seq_permissions.sql` para:
+- conceder `USAGE/SELECT` na sequence a `authenticated` e
+- recriar a função `get_next_checklist_seq` como `security definer`.
+
 2) Auth (apagar todos os usuários)
 - Requer a service role key. No PowerShell:
   - `$env:SUPABASE_URL="https://SEU-PROJECT.supabase.co"`
