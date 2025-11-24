@@ -81,7 +81,16 @@ security definer
 set search_path = public
 as $$
 declare n bigint;
+declare v integer;
 begin
+  -- Primeiro, reutilizar número disponível no pool
+  select min(val) into v from public.checklist_seq_pool;
+  if v is not null then
+    delete from public.checklist_seq_pool where val = v;
+    return 'CHECK-' || lpad(v::text, 6, '0');
+  end if;
+
+  -- Caso não haja número no pool, avançar a sequence
   n := nextval('public.checklist_seq');
   -- Formato solicitado: CHECK-000001
   return 'CHECK-' || lpad(n::text, 6, '0');

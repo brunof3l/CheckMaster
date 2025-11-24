@@ -143,6 +143,13 @@ export async function updateChecklist(id: string, patch: any) {
 }
 
 export async function deleteChecklist(id: string) {
+  // Buscar código antes da remoção para possível reutilização
+  let seqToRelease: string | null = null;
+  try {
+    const pre = await supabase.from('checklists').select('seq').eq('id', id).limit(1).maybeSingle();
+    seqToRelease = (pre.data as any)?.seq || null;
+  } catch {}
+
   // Remove diretamente o checklist; entradas em checklist_audit
   // serão removidas por ON DELETE CASCADE no banco.
   const res = await supabase.from('checklists').delete().eq('id', id);
@@ -152,7 +159,15 @@ export async function deleteChecklist(id: string) {
     const rpc = await supabase.rpc('admin_delete_checklist', { chk_id: id });
     if (rpc.error) return rpc;
     // Normaliza resposta semelhante ao delete()
+    // Após remoção via RPC, liberar número para reutilização
+    if (seqToRelease) {
+      try { await supabase.rpc('release_checklist_seq', { p_seq: seqToRelease }); } catch {}
+    }
     return { data: null, error: null } as any;
+  }
+  // Após remoção, liberar número para reutilização
+  if (!res.error && seqToRelease) {
+    try { await supabase.rpc('release_checklist_seq', { p_seq: seqToRelease }); } catch {}
   }
   return res as any;
 }
