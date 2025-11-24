@@ -190,8 +190,14 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       if (mode !== 'new' || draftId) return;
       setSeqLoading(true);
       try {
+        // Primeiro, obter próxima sequência para exibir imediatamente
+        let nextSeq: string | null = null;
+        try {
+          nextSeq = await getNextChecklistSeq();
+        } catch {}
+        if (nextSeq) setDraftSeq(nextSeq);
         const chk = await insertChecklist({
-          seq: null,
+          seq: nextSeq,
           plate: '',
           supplier_id: null,
           defect_items: [],
@@ -200,7 +206,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
           notes: ''
         });
         setDraftId(chk.id);
-        setDraftSeq(chk.seq || null);
+        setDraftSeq(chk.seq || nextSeq || null);
       } catch (e: any) {
         pushToast({ title: 'Falha ao gerar número', message: (e?.message || 'Erro ao criar rascunho').toString(), variant: 'danger' });
       } finally {
