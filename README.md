@@ -56,6 +56,11 @@ Para domínio próprio, defina `VITE_BASE_PATH=/` e atualize as configurações 
 - No Supabase SQL Editor, rode `supabase/migrations/reset.sql`.
 - Em seguida, rode `supabase/migrations/init.sql` e `supabase/migrations/security.sql` para reconstruir o schema e políticas.
 
+### Reset da sequência de checklists (voltar para CHECK-000001)
+- No Supabase SQL Editor, rode `supabase/migrations/reset_checklist_seq.sql`.
+- Isso reinicia a sequência `public.checklist_seq` para que o próximo número seja `CHECK-000001`.
+- Se existirem checklists sem numeração, o script também preenche `seq` automaticamente.
+
 2) Auth (apagar todos os usuários)
 - Requer a service role key. No PowerShell:
   - `$env:SUPABASE_URL="https://SEU-PROJECT.supabase.co"`

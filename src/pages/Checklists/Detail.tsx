@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useUIStore } from '../../stores/ui';
@@ -18,6 +18,7 @@ function secsToHMS(secs: number) {
 
 export function ChecklistDetail() {
   const { id } = useParams();
+  const nav = useNavigate();
   const pushToast = useUIStore(s => s.pushToast);
   const role = useAuthStore(s => s.role);
   const user = useAuthStore(s => s.user);
@@ -78,6 +79,15 @@ export function ChecklistDetail() {
         console.log('[DEBUG CM] detail checklist.budgetAttachments =', normalized?.budgetAttachments);
       } catch {}
       setItem(normalized);
+      // Garantir seq para registros antigos sem numeração
+      if (!normalized?.seq && id) {
+        try {
+          const { getNextChecklistSeq } = await import('../../services/supabase/rpc');
+          const next = await getNextChecklistSeq();
+          await saveChecklist(id, { seq: next } as any);
+          setItem(prev => ({ ...(prev || normalized), seq: next }));
+        } catch {}
+      }
       try {
         const mediaArr = (normalized?.media || []) as any[];
         const photosCount = mediaArr.length;
@@ -140,20 +150,7 @@ export function ChecklistDetail() {
         }
         setFuelUrls(newFuelUrls);
       } catch {}
-      // Move draft -> in progress on open
-      if (normalized?.status === 'rascunho') {
-        await setInProgress(id);
-        const updated = await getChecklist(id);
-        const normalizedUpdated: any = { ...updated };
-        if (!normalizedUpdated.media && (updated as any)?.attachments) normalizedUpdated.media = (updated as any)?.attachments;
-        if (!normalizedUpdated.budgetAttachments && ((updated as any)?.budgetattachments || (updated as any)?.budget_attachments)) {
-          normalizedUpdated.budgetAttachments = (updated as any)?.budgetattachments || (updated as any)?.budget_attachments;
-        }
-        if (!normalizedUpdated.fuelGaugePhotos && ((updated as any)?.fuelgaugephotos || (updated as any)?.fuel_gauge_photos)) {
-          normalizedUpdated.fuelGaugePhotos = (updated as any)?.fuelgaugephotos || (updated as any)?.fuel_gauge_photos;
-        }
-        setItem(normalizedUpdated);
-      }
+      // Não mover automaticamente; ação “Continuar edição” fará a transição
     } catch (e: any) {
       pushToast({ title: 'Erro', message: e.message, variant: 'danger' });
     } finally { setLoading(false); }
@@ -344,9 +341,9 @@ export function ChecklistDetail() {
         ) : (
           <Button onClick={handleFinalize} variant="default">Finalizar checklist</Button>
         )}
-        {!locked && item?.status === 'rascunho' && (
-          <div className="mt-2">
-            <Button variant="outline" onClick={() => window.location.assign(`/checklists/${id}/edit`)}>Continuar edição</Button>
+        {!locked && (
+          <div className="mt-2 flex items-center gap-2">
+            <Button variant="outline" onClick={async () => { if (id) { try { await setInProgress(id); } catch {} nav(`/checklists/${id}/edit`); } }}>Continuar edição</Button>
           </div>
         )}
         {locked && role === 'admin' && (
