@@ -70,6 +70,10 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
   const [supplierOpen, setSupplierOpen] = useState<boolean>(false);
   const [plateQuery, setPlateQuery] = useState<string>('');
   const [plateOpen, setPlateOpen] = useState<boolean>(false);
+  // Rascunho criado ao abrir para exibir seq imediatamente
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftSeq, setDraftSeq] = useState<string | null>(null);
+  const [seqLoading, setSeqLoading] = useState<boolean>(false);
   // Pré-visualizações de mídia (Fotos)
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
   // Ref persistente para evitar perda do array de arquivos ao navegar entre passos
@@ -180,6 +184,33 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
     }
   }, [location.state]);
 
+  // Criar rascunho ao abrir (modo novo) para obter seq e exibir na primeira tela
+  useEffect(() => {
+    const createDraft = async () => {
+      if (mode !== 'new' || draftId) return;
+      setSeqLoading(true);
+      try {
+        const chk = await insertChecklist({
+          seq: null,
+          plate: '',
+          supplier_id: null,
+          defect_items: [],
+          media: [],
+          status: 'rascunho',
+          notes: ''
+        });
+        setDraftId(chk.id);
+        setDraftSeq(chk.seq || null);
+      } catch (e: any) {
+        pushToast({ title: 'Falha ao gerar número', message: (e?.message || 'Erro ao criar rascunho').toString(), variant: 'danger' });
+      } finally {
+        setSeqLoading(false);
+      }
+    };
+    createDraft();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
   const onFinish = handleSubmit(async (data) => {
     setSubmitting(true);
     pushToast({ title: 'Salvando checklist', message: 'Processando dados e anexos…', variant: 'info' });
@@ -200,17 +231,24 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         return base;
       })();
 
-      const checklist = await insertChecklist({
-        seq: null,
-        plate: data.plateId,
-        supplier_id: supplierUuid,
-        // service: data.service, // removido para evitar erro quando coluna não existe
-        defect_items: defects,
-        media: [],
-        status: 'rascunho',
-        notes: combinedNotes,
-      });
-      const id = checklist.id as string;
+      // Usar rascunho já criado, ou criar se não existir (fallback)
+      let id = draftId;
+      if (!id) {
+        const checklist = await insertChecklist({
+          seq: null,
+          plate: data.plateId,
+          supplier_id: supplierUuid,
+          // service: data.service, // removido para evitar erro quando coluna não existe
+          defect_items: defects,
+          media: [],
+          status: 'rascunho',
+          notes: combinedNotes,
+        });
+        id = checklist.id as string;
+        setDraftId(id);
+        setDraftSeq(checklist.seq || null);
+      }
+      const checklistId = id as string;
       // Uploads iniciais
       let idx = 0;
       const mediaItems: any[] = [];
@@ -222,7 +260,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         if (!allowed.includes((f as File).type)) throw new Error('Apenas imagens JPEG/PNG/WebP são permitidas.');
         const toUpload: File = f as File;
         const ext = (toUpload.name.split('.').pop() || 'jpg');
-        const name = `${id}/${safeUuid()}.${ext}`;
+        const name = `${checklistId}/${safeUuid()}.${ext}`;
         const { error } = await supabase.storage.from('checklists').upload(name, toUpload);
         if (error) throw error;
         const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(name, 3600);
@@ -244,7 +282,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         if (!allowedBudget.includes(mime)) throw new Error('Anexos permitidos: PDF/JPEG/PNG/WebP.');
         const name = (f as File)?.name || 'anexo';
         const ext = name.includes('.') ? name.split('.').pop() : 'bin';
-        const path = `${id}/budget-${safeUuid()}.${ext}`;
+        const path = `${checklistId}/budget-${safeUuid()}.${ext}`;
         const { error } = await supabase.storage.from('checklists').upload(path, f as File);
         if (error) throw error;
         budgetAttachments.push({ type: 'budget', path, name, created_at: new Date().toISOString() });
@@ -257,7 +295,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         const entryF = entryCandidate as File;
         if (!['image/jpeg','image/png','image/webp'].includes(entryF.type)) throw new Error('Foto de combustível inválida.');
         const entryExt = entryF.type === 'image/png' ? 'png' : (entryF.type === 'image/webp' ? 'webp' : 'jpg');
-        const path = `${id}/fuel-entry-${safeUuid()}.${entryExt}`;
+        const path = `${checklistId}/fuel-entry-${safeUuid()}.${entryExt}`;
         const { error } = await supabase.storage.from('checklists').upload(path, entryF);
         if (error) throw error;
         fuelGaugePhotos.entry = path;
@@ -267,7 +305,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         const exitF = exitCandidate as File;
         if (!['image/jpeg','image/png','image/webp'].includes(exitF.type)) throw new Error('Foto de combustível inválida.');
         const exitExt = exitF.type === 'image/png' ? 'png' : (exitF.type === 'image/webp' ? 'webp' : 'jpg');
-        const path = `${id}/fuel-exit-${safeUuid()}.${exitExt}`;
+        const path = `${checklistId}/fuel-exit-${safeUuid()}.${exitExt}`;
         const { error } = await supabase.storage.from('checklists').upload(path, exitF);
         if (error) throw error;
         fuelGaugePhotos.exit = path;
@@ -276,12 +314,17 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
 
       // Atualização com campos condicionais para evitar zerar arrays existentes
       const patch: any = {};
+      // Atualizar campos base do cadastro
+      patch.plate = data.plateId;
+      patch.supplier_id = supplierUuid;
+      patch.defect_items = defects;
+      patch.notes = combinedNotes;
       if (Array.isArray(mediaItems) && mediaItems.length > 0) patch.media = mediaItems;
       if (Array.isArray(budgetAttachments) && budgetAttachments.length > 0) patch.budgetAttachments = budgetAttachments;
       if (fuelGaugePhotos && (fuelGaugePhotos.entry || fuelGaugePhotos.exit)) patch.fuelGaugePhotos = fuelGaugePhotos;
       console.log('[DEBUG CM] updateChecklist payload =', patch);
       // Atualização única dos campos presentes
-      await updateChecklist(id, patch);
+      await updateChecklist(checklistId, patch);
       // Feedback de depuração: quantidades salvas
       try {
         const fuelCount = (fuelGaugePhotos?.entry ? 1 : 0) + (fuelGaugePhotos?.exit ? 1 : 0);
@@ -289,13 +332,13 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       } catch {}
       // mover para em andamento para iniciar contagem do tempo
       try {
-        await setInProgress(id);
+        await setInProgress(checklistId);
       } catch {}
       // aviso somente: checklist aberto e ação necessária de finalizar
       pushToast({ title: 'Checklist aberto', message: 'Checklist foi aberto e está em andamento.', variant: 'info' });
       pushToast({ title: 'Ação necessária', message: 'Finalize o checklist na página de detalhes quando concluir.', variant: 'warning' });
       // navegar para a página de detalhes
-      nav(`/checklists/${id}`);
+      nav(`/checklists/${checklistId}`);
     } catch (e: any) {
       const msg: string = (e?.message || '').toString();
       const needsPolicyHint = /row-level|permission|policy|denied|Not\s+authorized/i.test(msg);
@@ -324,7 +367,10 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
   const Steps = [
     (
       <section className="space-y-2">
-        <div className="text-xs text-gray-500">Seq. autogerada via Cloud Function ao salvar</div>
+        <div className="space-y-1">
+          <div className="text-xs text-gray-500">Número do checklist (visualização)</div>
+          <input className="cm-input font-mono" value={draftSeq || ''} readOnly placeholder={seqLoading ? 'Gerando…' : '—'} />
+        </div>
         <div className="flex items-center gap-2">
           <div className="relative flex-1" ref={plateBoxRef}>
             <input type="hidden" {...register('plateId')} />
