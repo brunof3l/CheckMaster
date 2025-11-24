@@ -75,14 +75,18 @@ create table if not exists public.cnpj_cache (
 create sequence if not exists public.checklist_seq start 1;
 
 create or replace function public.get_next_checklist_seq()
-returns text as $$
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
 declare n bigint;
 begin
   n := nextval('public.checklist_seq');
   -- Formato solicitado: CHECK-000001
   return 'CHECK-' || lpad(n::text, 6, '0');
 end;
-$$ language plpgsql;
+$$;
 
 -- Backfill: atribuir seq para registros existentes sem código
 do $$ begin

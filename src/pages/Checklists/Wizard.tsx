@@ -192,12 +192,11 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       if (mode !== 'new' || draftId) return;
       setSeqLoading(true);
       try {
-        // Primeiro, obter próxima sequência para exibir imediatamente
-        let nextSeq: string | null = null;
-        try {
-          nextSeq = await getNextChecklistSeq();
-        } catch {}
-        if (nextSeq) setDraftSeq(nextSeq);
+        // Primeiro, obter próxima sequência via RPC
+        const s = await getNextChecklistSeq();
+        const nextSeq = (typeof s === 'string' && s.trim().length) ? s : null;
+        if (!nextSeq) throw new Error('Sequência vazia retornada pela RPC.');
+        setDraftSeq(nextSeq);
         const chk = await insertChecklist({
           seq: nextSeq,
           plate: '',
@@ -208,9 +207,9 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
           notes: ''
         });
         setDraftId(chk.id);
-        setDraftSeq(chk.seq || nextSeq || null);
+        setDraftSeq((chk as any)?.seq || nextSeq || null);
       } catch (e: any) {
-        pushToast({ title: 'Falha ao gerar número', message: (e?.message || 'Erro ao criar rascunho').toString(), variant: 'danger' });
+        pushToast({ title: 'Falha ao gerar número', message: (e?.message || 'Erro ao criar rascunho').toString() + ' • Dica: rode fix_seq_permissions.sql e reset_checklist_seq.sql no Supabase.', variant: 'danger' });
       } finally {
         setSeqLoading(false);
       }

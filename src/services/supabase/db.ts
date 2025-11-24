@@ -24,14 +24,12 @@ export async function insertChecklist(d: any) {
   // Usar seq fornecida pelo chamador quando existir; caso contrário gerar
   let seq: string | null = (d?.seq ?? null) as string | null;
   if (!seq) {
-    try {
-      const { data: s } = await supabase.rpc('get_next_checklist_seq');
-      seq = (s as any) || null;
-    } catch {
-      // Fallback: seq temporária baseada em timestamp (não totalmente sequencial)
-      const p = String(Math.floor(Date.now() / 1000)).slice(-6).padStart(6, '0');
-      seq = `CHECK-${p}`;
+    const { data: s, error } = await supabase.rpc('get_next_checklist_seq');
+    if (error) throw error;
+    if (!(typeof s === 'string' && s.trim().length)) {
+      throw new Error('Falha ao obter sequência. Execute a migração fix_seq_permissions.sql e reset_checklist_seq.sql no Supabase.');
     }
+    seq = s as any;
   }
   const { data, error } = await supabase.from('checklists').insert([{ ...d, seq, plate, created_by: createdBy }]).select().single();
   if (error) throw error;

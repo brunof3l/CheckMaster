@@ -9,8 +9,9 @@ create sequence if not exists public.checklist_seq start 1;
 -- Reiniciar contador para que o próximo seja 1 (gera CHECK-000001)
 alter sequence public.checklist_seq restart with 1;
 
--- Alternativa para Postgres antigos: força próximo valor como 1
-select setval('public.checklist_seq', 0, false);
+-- Forçar próximo valor como 1: use 1 (não 0)
+-- "is_called = false" faz o próximo nextval() retornar exatamente 1
+select setval('public.checklist_seq', 1, false);
 
 -- Se houver registros sem seq, preencher com novos códigos
 update public.checklists
