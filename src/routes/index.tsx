@@ -21,6 +21,7 @@ export function AppRoutes() {
       <Route path="/home" element={<ProtectedRoute requireVerifiedEmail={false}><Home /></ProtectedRoute>} />
       <Route path="/checklists" element={<ProtectedRoute requireVerifiedEmail={false}><ChecklistsList /></ProtectedRoute>} />
       <Route path="/checklists/new" element={<ProtectedRoute requireVerifiedEmail={false}><ChecklistWizard mode="new" /></ProtectedRoute>} />
+      <Route path="/checklists/:id/edit" element={<ProtectedRoute requireVerifiedEmail={false}><ChecklistWizard mode="edit" /></ProtectedRoute>} />
       <Route path="/checklists/:id" element={<ProtectedRoute requireVerifiedEmail={false}><ChecklistDetail /></ProtectedRoute>} />
       <Route path="/checklists/in-progress" element={<ProtectedRoute requireVerifiedEmail={false}><InProgressPage /></ProtectedRoute>} />
       <Route path="/checklists/finished" element={<ProtectedRoute requireVerifiedEmail={false}><FinishedPage /></ProtectedRoute>} />

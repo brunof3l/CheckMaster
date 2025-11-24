@@ -11,8 +11,9 @@ import { supabase } from '../../config/supabase';
 import { insertChecklist, updateChecklist, listVehicles, listSuppliers } from '../../services/supabase/db';
 import { setInProgress } from '../../services/checklists';
 import { useAuthStore } from '../../stores/auth';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getNextChecklistSeq } from '../../services/supabase/rpc';
+import { getChecklist } from '../../services/checklists';
 import { Store, PlusCircle, X } from 'lucide-react';
 import { isValidUUID } from '../../utils/validators';
 // Use native crypto.randomUUID for unique filenames
@@ -56,6 +57,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
   const user = useAuthStore(s => s.user);
   const nav = useNavigate();
   const location = useLocation();
+  const { id: paramId } = useParams();
   const budgetInputRef = useRef<HTMLInputElement>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const fuelEntryRef = useRef<HTMLInputElement>(null);
@@ -216,6 +218,35 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
     createDraft();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
+
+  // Carregar checklist existente ao abrir em modo edição
+  useEffect(() => {
+    const loadExisting = async () => {
+      if (mode !== 'edit' || !paramId) return;
+      setSeqLoading(true);
+      try {
+        const data = await getChecklist(paramId);
+        setDraftId(paramId);
+        setDraftSeq((data as any)?.seq || null);
+        const plateVal = (data as any)?.plate || '';
+        setValue('plateId', plateVal);
+        setPlateQuery(plateVal);
+        const supId = (data as any)?.supplier_id || '';
+        if (supId) setValue('supplierId', supId);
+        setSupplierQuery('');
+        const notesVal = (data as any)?.notes || '';
+        setValue('notes', notesVal);
+        const defectsArr = Array.isArray((data as any)?.defect_items) ? ((data as any).defect_items as any[]).map(d => ({ itemId: d?.itemId || d?.name || safeUuid(), name: d?.name || d?.itemId || 'Item', note: d?.note })) : [];
+        setValue('defectItems', defectsArr);
+      } catch (e: any) {
+        pushToast({ title: 'Falha ao carregar rascunho', message: (e?.message || 'Erro ao carregar').toString(), variant: 'danger' });
+      } finally {
+        setSeqLoading(false);
+      }
+    };
+    loadExisting();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, paramId]);
 
   const onFinish = handleSubmit(async (data) => {
     setSubmitting(true);

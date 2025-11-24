@@ -138,7 +138,7 @@ export function Home() {
                         {list.map(it => (
                           <li key={it.id} className="py-2 flex items-center justify-between">
                             <div className="text-xs text-gray-100">
-                              <span className="font-mono">{it.seq || it.id}</span> • <span>{it.plate || '-'}</span> • <span className="uppercase">{it.status || '-'}</span>
+                              <span className="font-mono">{it.seq || '—'}</span> • <span>{it.plate || '-'}</span> • <span className="uppercase">{it.status || '-'}</span>
                             </div>
                             <Button size="sm" variant="primary" onClick={() => handleExport(it.id)}>
                               <span className="inline-flex items-center gap-2"><FileDown size={14} /> Exportar PDF</span>

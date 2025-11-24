@@ -84,7 +84,7 @@ export function ChecklistsList() {
               <tbody>
                 {items.slice(0, showAll ? items.length : 5).map(it => (
                   <tr key={it.id}>
-                    <td className="p-2">{it.seq || it.id}</td>
+                    <td className="p-2">{it.seq || '—'}</td>
                     <td className="p-2">{it.plate || '-'}</td>
                     <td className="p-2">{it.supplierName || '-'}</td>
                     <td className="p-2">{it.status ? <Badge variant={it.status === 'finalizado' ? 'success' : it.status === 'em_andamento' ? 'warning' : 'info'}>{it.status}</Badge> : '-'}</td>

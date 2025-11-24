@@ -234,7 +234,7 @@ export function ChecklistDetail() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
           <div>
             <div className="text-sm font-semibold">Checklist</div>
-            <div className="text-xs text-gray-500">{item?.seq || item?.id}</div>
+            <div className="text-xs text-gray-500">{item?.seq || '—'}</div>
           </div>
           <div className="text-xs">
             <div>Placa: <span className="font-mono">{item?.plate || '-'}</span></div>
@@ -343,6 +343,11 @@ export function ChecklistDetail() {
           <div className="text-xs">Finalizado em: {item?.finished_at ? new Date(item.finished_at).toLocaleString() : '-'}</div>
         ) : (
           <Button onClick={handleFinalize} variant="default">Finalizar checklist</Button>
+        )}
+        {!locked && item?.status === 'rascunho' && (
+          <div className="mt-2">
+            <Button variant="outline" onClick={() => window.location.assign(`/checklists/${id}/edit`)}>Continuar edição</Button>
+          </div>
         )}
         {locked && role === 'admin' && (
           <div className="text-xs text-gray-500">Apenas admin pode reabrir (RPC configurada).</div>
