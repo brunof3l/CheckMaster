@@ -44,9 +44,9 @@ create policy storage_delete_admin
     bucket_id = 'checklists'
     and exists (
       select 1
-      from public.profiles p
-      where p.user_id = auth.uid()
-        and p.role = 'admin'
+      from public.users u
+      where u.id = auth.uid()
+        and lower(btrim(coalesce(u.role, ''))) = 'admin'
     )
   );
 

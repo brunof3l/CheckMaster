@@ -292,10 +292,15 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       let mediaFiles = mediaSelectedRef.current.length ? mediaSelectedRef.current : ((watch('media') || []) as File[]);
       console.log('[DEBUG CM] onFinish selected media files =', mediaFiles?.map(f => (f as any)?.name || 'file'));
       for (const f of mediaFiles) {
-        const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-        if (!allowed.includes((f as File).type)) throw new Error('Apenas imagens JPEG/PNG/WebP são permitidas.');
+        const mime = (f as File).type || '';
+        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+        if (!allowed.includes(mime)) {
+          // Ignorar arquivo não suportado e continuar
+          try { pushToast({ title: 'Arquivo ignorado', message: `Formato não suportado: ${(f as any)?.name || 'arquivo'}`, variant: 'warning' }); } catch {}
+          continue;
+        }
         const toUpload: File = f as File;
-        const ext = (toUpload.name.split('.').pop() || 'jpg');
+        const ext = (toUpload.name.split('.').pop() || (mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : mime.includes('heic') ? 'heic' : mime.includes('heif') ? 'heif' : 'jpg'));
         const name = `${checklistId}/${safeUuid()}.${ext}`;
         const { error } = await supabase.storage.from('checklists').upload(name, toUpload);
         if (error) throw error;
@@ -329,8 +334,9 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       const entryCandidate = (data as any).fuelGaugeEntry || fuelEntrySelectedRef.current;
       if (entryCandidate) {
         const entryF = entryCandidate as File;
-        if (!['image/jpeg','image/png','image/webp'].includes(entryF.type)) throw new Error('Foto de combustível inválida.');
-        const entryExt = entryF.type === 'image/png' ? 'png' : (entryF.type === 'image/webp' ? 'webp' : 'jpg');
+        const mime = entryF.type || '';
+        if (!['image/jpeg','image/png','image/webp','image/heic','image/heif'].includes(mime)) throw new Error('Foto de combustível inválida.');
+        const entryExt = (entryF.name.split('.').pop() || (mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : mime.includes('heic') ? 'heic' : mime.includes('heif') ? 'heif' : 'jpg'));
         const path = `${checklistId}/fuel-entry-${safeUuid()}.${entryExt}`;
         const { error } = await supabase.storage.from('checklists').upload(path, entryF);
         if (error) throw error;
@@ -339,8 +345,9 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       const exitCandidate = (data as any).fuelGaugeExit || fuelExitSelectedRef.current;
       if (exitCandidate) {
         const exitF = exitCandidate as File;
-        if (!['image/jpeg','image/png','image/webp'].includes(exitF.type)) throw new Error('Foto de combustível inválida.');
-        const exitExt = exitF.type === 'image/png' ? 'png' : (exitF.type === 'image/webp' ? 'webp' : 'jpg');
+        const mime = exitF.type || '';
+        if (!['image/jpeg','image/png','image/webp','image/heic','image/heif'].includes(mime)) throw new Error('Foto de combustível inválida.');
+        const exitExt = (exitF.name.split('.').pop() || (mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : mime.includes('heic') ? 'heic' : mime.includes('heif') ? 'heif' : 'jpg'));
         const path = `${checklistId}/fuel-exit-${safeUuid()}.${exitExt}`;
         const { error } = await supabase.storage.from('checklists').upload(path, exitF);
         if (error) throw error;

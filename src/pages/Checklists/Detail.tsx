@@ -171,9 +171,11 @@ export function ChecklistDetail() {
       // Upload de todas as fotos e atualização única da coluna `media`
       if (mediaSelection.length) {
         const nextMedia = [ ...(item?.media || []) ];
+        let skipped = 0;
         for (const f of mediaSelection) {
-          const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-          if (!allowed.includes(f.type)) { throw new Error('Apenas imagens JPEG/PNG/WebP são permitidas.'); }
+          const mime = f.type || '';
+          const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+          if (!allowed.includes(mime)) { skipped++; continue; }
           const { path, url } = await uploadPhoto(id!, f);
           nextMedia.push({ type: 'photo', path, url, created_at: new Date().toISOString() });
         }
@@ -185,7 +187,7 @@ export function ChecklistDetail() {
           const fuel = (item as any)?.fuelGaugePhotos || {};
           return (fuel?.entry ? 1 : 0) + (fuel?.exit ? 1 : 0);
         })();
-        pushToast({ title: 'Anexos salvos', message: `Fotos: ${photoCount} • Orçamento: ${budgetCount} • Combustível: ${fuelCount}` , variant: 'success' });
+        pushToast({ title: 'Anexos salvos', message: `Fotos: ${photoCount}${skipped ? ` • Ignorados: ${skipped}` : ''} • Orçamento: ${budgetCount} • Combustível: ${fuelCount}` , variant: 'success' });
       }
       setMediaSelection([]);
       await load();
