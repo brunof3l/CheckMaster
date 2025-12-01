@@ -11,8 +11,10 @@ import { Clock, FileDown } from 'lucide-react';
 
 export function Home() {
   const [showExport, setShowExport] = useState(false);
+  const [showDrafts, setShowDrafts] = useState(false);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<Array<{ id: string; seq?: string; plate?: string; status?: string }>>([]);
+  const [drafts, setDrafts] = useState<Array<{ id: string; seq?: string; plate?: string; status?: string }>>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [openCount, setOpenCount] = useState(0);
@@ -34,6 +36,17 @@ export function Home() {
     };
     if (showExport) fetchData();
   }, [showExport]);
+
+  useEffect(() => {
+    const fetchDrafts = async () => {
+      try {
+        const { data, error } = await supabase.from('checklists').select('*').eq('status', 'rascunho').order('created_at', { ascending: false });
+        if (error) throw error;
+        setDrafts(data || []);
+      } catch (_) { /* silencioso */ }
+    };
+    if (showDrafts) fetchDrafts();
+  }, [showDrafts]);
 
   useEffect(() => {
     const fetchCounts = async () => {
@@ -61,8 +74,11 @@ export function Home() {
     <div className="space-y-4 py-3">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <Card>
-          <div className="text-xs text-gray-500 dark:text-white/60">Abertos</div>
-          <div className="text-3xl font-bold">{openCount}</div>
+          <div className="flex flex-col h-full">
+            <div className="text-xs text-gray-500 dark:text-white/60">Abertos</div>
+            <div className="text-3xl font-bold">{openCount}</div>
+            <div className="mt-auto pt-3"><Button variant="primary" size="sm" className="w-fit" onClick={() => setShowDrafts(true)}>Ver lista</Button></div>
+          </div>
         </Card>
         <Card>
           <div className="flex flex-col h-full">
@@ -96,6 +112,34 @@ export function Home() {
           </Button>
         </div>
       </Card>
+
+      {showDrafts && (
+        <div className="cm-modal-backdrop flex items-end">
+          <div className="cm-modal max-h-[70vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-semibold text-white">Rascunhos abertos</div>
+              <Button size="sm" variant="outline" onClick={() => setShowDrafts(false)}>Fechar</Button>
+            </div>
+            {drafts.length ? (
+              <ul className="divide-y divide-white/10">
+                {drafts.map(it => (
+                  <li key={it.id} className="py-2 flex items-center justify-between">
+                    <div className="text-xs text-gray-100">
+                      <span className="font-mono">{it.seq || '—'}</span> • <span>{it.plate || '-'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Link to={`/checklists/${it.id}/edit`} className="cm-btn cm-btn-primary cm-btn-sm">Editar</Link>
+                      <Link to={`/checklists/${it.id}`} className="cm-btn cm-btn-outline cm-btn-sm">Detalhes</Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-xs text-gray-100">Nenhum rascunho encontrado.</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showExport && (
         <div className="cm-modal-backdrop flex items-end">
