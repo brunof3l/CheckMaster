@@ -20,6 +20,15 @@ import { isValidUUID } from '../../utils/validators';
 import { useUIStore } from '../../stores/ui';
 import { safeUuid } from '../../utils/id';
 
+// Helper: sanitiza o nome do arquivo para uso em path do Storage
+function sanitizeFilename(name: string): string {
+  const trimmed = (name || '').trim();
+  // Remove quaisquer caracteres problemáticos e espaços duplicados
+  const basic = trimmed.replace(/[^a-zA-Z0-9_.\-\s]/g, '').replace(/\s+/g, ' ');
+  // Evita nomes vazios
+  return (basic || 'arquivo').toLowerCase();
+}
+
 const schema = z.object({
   plateId: z.string().min(1),
   service: z.enum(['Revisão', 'Revisão Geral', 'Corretiva', 'Preventiva']),
@@ -78,6 +87,9 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
   const [seqLoading, setSeqLoading] = useState<boolean>(false);
   // Pré-visualizações de mídia (Fotos)
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
+  // Fotos já salvas no checklist (persistentes)
+  const [existingMediaUrls, setExistingMediaUrls] = useState<Record<string, string>>({});
+  const existingMediaRef = useRef<any[]>([]);
   // Ref persistente para evitar perda do array de arquivos ao navegar entre passos
   const mediaSelectedRef = useRef<File[]>([]);
   const budgetSelectedRef = useRef<File[]>([]);
@@ -237,6 +249,29 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
         setValue('notes', notesVal);
         const defectsArr = Array.isArray((data as any)?.defect_items) ? ((data as any).defect_items as any[]).map(d => ({ itemId: d?.itemId || d?.name || safeUuid(), name: d?.name || d?.itemId || 'Item', note: d?.note })) : [];
         setValue('defectItems', defectsArr);
+
+        // Correção: carregar mídias persistidas e gerar URLs assinadas para renderização
+        const persistedMedia = Array.isArray((data as any)?.media) ? ((data as any).media as any[]) : (Array.isArray((data as any)?.attachments) ? ((data as any).attachments as any[]) : []);
+        existingMediaRef.current = persistedMedia;
+        try {
+          const urls: Record<string, string> = {};
+          for (const m of persistedMedia) {
+            const p = m?.path || m?.fullPath || '';
+            if (!p) continue;
+            try {
+              const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(p, 3600);
+              const u = signed?.signedUrl || m?.url;
+              if (u) urls[p] = u;
+            } catch (e: any) {
+              // Fallback: usar URL previamente salva quando assinatura falhar
+              if (m?.url) urls[p] = m.url;
+              try { console.log('[DEBUG CM] Signed URL falhou para', p, '-', e?.message || e); } catch {}
+            }
+          }
+          setExistingMediaUrls(urls);
+        } catch (e: any) {
+          try { console.log('[DEBUG CM] Falha ao gerar URLs de mídia existentes:', e?.message || e); } catch {}
+        }
       } catch (e: any) {
         pushToast({ title: 'Falha ao carregar rascunho', message: (e?.message || 'Erro ao carregar').toString(), variant: 'danger' });
       } finally {
@@ -300,12 +335,17 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
           continue;
         }
         const toUpload: File = f as File;
-        const ext = (toUpload.name.split('.').pop() || (mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : mime.includes('heic') ? 'heic' : mime.includes('heif') ? 'heif' : 'jpg'));
-        const name = `${checklistId}/${safeUuid()}.${ext}`;
-        const { error } = await supabase.storage.from('checklists').upload(name, toUpload);
-        if (error) throw error;
-        const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(name, 3600);
-        mediaItems.push({ type: 'photo', path: name, url: signed?.signedUrl, created_at: new Date().toISOString() });
+        const originalName = sanitizeFilename(toUpload.name || 'foto');
+        const ext = (originalName.split('.').pop() || (mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : mime.includes('heic') ? 'heic' : mime.includes('heif') ? 'heif' : 'jpg'));
+        const path = `${checklistId}/${Date.now()}-${originalName.replace(/\.[^.]+$/, '')}.${ext}`;
+        const { data, error } = await supabase.storage.from('checklists').upload(path, toUpload);
+        if (error) {
+          try { console.error('[DEBUG CM] upload falhou:', error.message || error); } catch {}
+          throw error;
+        }
+        const storedPath = data?.path || path;
+        const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(storedPath, 3600);
+        mediaItems.push({ type: 'photo', path: storedPath, url: signed?.signedUrl, created_at: new Date().toISOString() });
         idx++;
         setUploadProgress(Math.round((idx / (mediaFiles.length || 1)) * 100));
       }
@@ -355,19 +395,40 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       }
       console.log('[DEBUG CM] onFinish fuelGaugePhotos =', fuelGaugePhotos);
 
-      // Atualização com campos condicionais para evitar zerar arrays existentes
+      // Atualização única dos campos presentes
       const patch: any = {};
       // Atualizar campos base do cadastro
       patch.plate = data.plateId;
       patch.supplier_id = supplierUuid;
       patch.defect_items = defects;
       patch.notes = combinedNotes;
-      if (Array.isArray(mediaItems) && mediaItems.length > 0) patch.media = mediaItems;
+      // Correção: mesclar novas mídias com já existentes, evitando perda ao reabrir
+      if (Array.isArray(mediaItems) && mediaItems.length > 0) {
+        const merged = [...(existingMediaRef.current || []), ...mediaItems];
+        patch.media = merged;
+      }
       if (Array.isArray(budgetAttachments) && budgetAttachments.length > 0) patch.budgetAttachments = budgetAttachments;
       if (fuelGaugePhotos && (fuelGaugePhotos.entry || fuelGaugePhotos.exit)) patch.fuelGaugePhotos = fuelGaugePhotos;
       console.log('[DEBUG CM] updateChecklist payload =', patch);
       // Atualização única dos campos presentes
       await updateChecklist(checklistId, patch);
+      // Atualizar ref e URLs existentes após salvar
+      if (patch.media) {
+        existingMediaRef.current = patch.media;
+        try {
+          const urls: Record<string, string> = {};
+          for (const m of (patch.media as any[])) {
+            const p = m?.path;
+            if (!p) continue;
+            try {
+              const { data: signed } = await supabase.storage.from('checklists').createSignedUrl(p, 3600);
+              const u = signed?.signedUrl || m?.url;
+              if (u) urls[p] = u;
+            } catch {}
+          }
+          setExistingMediaUrls(urls);
+        } catch {}
+      }
       // Feedback de depuração: quantidades salvas
       try {
         const fuelCount = (fuelGaugePhotos?.entry ? 1 : 0) + (fuelGaugePhotos?.exit ? 1 : 0);
@@ -387,6 +448,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       const needsPolicyHint = /row-level|permission|policy|denied|Not\s+authorized/i.test(msg);
       const hint = needsPolicyHint ? ' • Dica: verifique as policies do bucket "checklists" (INSERT/SELECT para authenticated).' : '';
       pushToast({ title: 'Erro ao salvar', message: msg + hint, variant: 'danger' });
+      try { console.error('[DEBUG CM] Erro onFinish:', e); } catch {}
     }
     finally { setSubmitting(false); }
   }, (errors) => {
@@ -561,7 +623,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
       <section className="space-y-2">
         <Card className="p-3 space-y-2">
           <div className="text-sm font-semibold">Fotos</div>
-          <div className="text-xs text-gray-500">Anexe fotos; compactamos para reduzir tamanho.</div>
+          <div className="text-xs text-gray-500">Anexe fotos; garantimos persistência no Storage e na coluna media.</div>
           <Controller control={control} name="media" defaultValue={[]} render={({ field }) => (
             <input ref={mediaInputRef} type="file" className="hidden" accept="image/*" multiple onChange={(e) => {
               const files = Array.from(e.target.files || []);
@@ -569,6 +631,7 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
               const next = [ ...current, ...files ];
               field.onChange(next);
               mediaSelectedRef.current = next;
+              // Correção: reset do input para permitir re-selecionar o mesmo arquivo
               (e.target as HTMLInputElement).value = '';
             }} />
           )} />
@@ -580,6 +643,17 @@ export function ChecklistWizard({ mode }: { mode: 'new' | 'edit' }) {
               <div className="text-xs text-gray-500">Nenhuma foto selecionada</div>
             )}
           </div>
+          {/* Correção: exibir fotos já persistidas ao reabrir o checklist */}
+          {Object.keys(existingMediaUrls).length ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {Object.entries(existingMediaUrls).map(([path, url]) => (
+                <a key={path} href={url} target="_blank" rel="noreferrer" className="cm-card p-2 block">
+                  <img src={url} alt={path} className="w-full h-32 object-cover rounded" />
+                  <div className="mt-1 text-[11px] font-mono truncate">{path}</div>
+                </a>
+              ))}
+            </div>
+          ) : null}
           {watch('media')?.length ? (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {watch('media').map((f, i) => (
