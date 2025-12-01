@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { useUIStore } from '../../stores/ui';
 import { useAuthStore } from '../../stores/auth';
 import { finalizeChecklist, getChecklist, saveChecklist, setInProgress, debugLoadChecklistRaw } from '../../services/checklists';
-import { uploadPhoto } from '../../services/supabase/storage';
+import { uploadChecklistMedia } from '../../services/supabase/storage';
 import { supabase } from '../../config/supabase';
 import { safeUuid } from '../../utils/id';
 
@@ -27,7 +27,7 @@ export function ChecklistDetail() {
   const [saving, setSaving] = useState(false);
   const [notes, setNotes] = useState('');
   const mediaInputRef = useRef<HTMLInputElement>(null);
-  const [mediaSelection, setMediaSelection] = useState<File[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [supplierName, setSupplierName] = useState<string>('');
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   const [budgetUrls, setBudgetUrls] = useState<Record<string, string>>({});
@@ -167,29 +167,21 @@ export function ChecklistDetail() {
         setSaving(false);
         return;
       }
-      await saveChecklist(id, { notes });
-      // Upload de todas as fotos e atualização única da coluna `media`
-      if (mediaSelection.length) {
-        const nextMedia = [ ...(item?.media || []) ];
-        let skipped = 0;
-        for (const f of mediaSelection) {
-          const mime = f.type || '';
-          const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-          if (!allowed.includes(mime)) { skipped++; continue; }
-          const { path, url } = await uploadPhoto(id!, f);
-          nextMedia.push({ type: 'photo', path, url, created_at: new Date().toISOString() });
-        }
-        await saveChecklist(id, { media: nextMedia });
-        // Toast com contagem correta baseada em `media`
-        const photoCount = Array.isArray(nextMedia) ? nextMedia.filter(m => m?.type === 'photo').length : 0;
+      // Primeiro, realizar upload das fotos e atualizar `media`
+      if (pendingFiles.length) {
+        const { uploaded, media } = await uploadChecklistMedia(id!, pendingFiles, item?.media || []);
+        const skipped = pendingFiles.length - uploaded;
+        const photoCount = Array.isArray(media) ? media.filter(m => m?.type === 'photo').length : 0;
         const budgetCount = Array.isArray(item?.budgetAttachments) ? item!.budgetAttachments.length : 0;
         const fuelCount = (() => {
           const fuel = (item as any)?.fuelGaugePhotos || {};
           return (fuel?.entry ? 1 : 0) + (fuel?.exit ? 1 : 0);
         })();
-        pushToast({ title: 'Anexos salvos', message: `Fotos: ${photoCount}${skipped ? ` • Ignorados: ${skipped}` : ''} • Orçamento: ${budgetCount} • Combustível: ${fuelCount}` , variant: 'success' });
+        pushToast({ title: 'Anexos salvos', message: `Fotos: ${photoCount}${skipped ? ` • Ignorados: ${skipped}` : ''} • Orçamento: ${budgetCount} • Combustível: ${fuelCount}`, variant: 'success' });
       }
-      setMediaSelection([]);
+      // Em seguida, salvar demais alterações (ex.: notas)
+      await saveChecklist(id, { notes });
+      setPendingFiles([]);
       await load();
     } catch (e: any) {
       const msg: string = (e?.message || '').toString();
@@ -197,6 +189,14 @@ export function ChecklistDetail() {
       const hint = needsPolicyHint ? ' • Dica: verifique as policies do bucket "checklists" (INSERT/SELECT para authenticated).' : '';
       pushToast({ title: 'Erro ao salvar', message: msg + hint, variant: 'danger' });
     } finally { setSaving(false); }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length) {
+      setPendingFiles(prev => ([...prev, ...files]));
+    }
+    e.target.value = '';
   };
 
   const handleFinalize = async () => {
@@ -257,20 +257,16 @@ export function ChecklistDetail() {
         <textarea className="cm-input" value={notes} onChange={e => setNotes(e.target.value)} disabled={locked} placeholder="Observações" />
         <div className="flex items-center gap-2">
           <Button variant="outline" disabled={locked} onClick={() => mediaInputRef.current?.click()}>Adicionar fotos</Button>
-          <input ref={mediaInputRef} type="file" className="hidden" accept="image/*" multiple onChange={(e) => {
-            const files = Array.from(e.target.files || []);
-            setMediaSelection(prev => ([...prev, ...files]));
-            (e.target as HTMLInputElement).value = '';
-          }} />
-          {mediaSelection.length ? <div className="text-xs">{mediaSelection.length} arquivo(s) para enviar</div> : <div className="text-xs text-gray-500">Nenhum arquivo para enviar</div>}
+          <input ref={mediaInputRef} type="file" className="hidden" accept="image/*" multiple onChange={handleFileChange} />
+          {pendingFiles.length ? <div className="text-xs">{pendingFiles.length} arquivo(s) para enviar</div> : <div className="text-xs text-gray-500">Nenhum arquivo para enviar</div>}
         </div>
-        {mediaSelection.length ? (
+        {pendingFiles.length ? (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {mediaSelection.map((f, i) => (
+            {pendingFiles.map((f, i) => (
               <div key={i} className="text-xs cm-card p-2 flex items-center justify-between gap-2">
                 <span className="truncate">{f.name}</span>
                 <Button size="sm" variant="ghost" onClick={() => {
-                  setMediaSelection(prev => prev.filter((_, idx) => idx !== i));
+                  setPendingFiles(prev => prev.filter((_, idx) => idx !== i));
                 }}>Remover</Button>
               </div>
             ))}
